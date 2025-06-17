@@ -9,18 +9,36 @@ import (
 	"github.com/google/uuid"
 )
 
-func AddNewEmployeePayment(c *fiber.Ctx)error{
-	p := models.Payment{}
+func AddNewEmployeePayment(c *fiber.Ctx) error {
+	var p models.Payment
+
+	// Parse JSON body
 	if err := c.BodyParser(&p); err != nil {
-		log.Println(err.Error())
-		return utils.NewErrorResponse(c,"failed to parse json data",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+		log.Println("JSON parsing error:", err)
+		return utils.NewErrorResponse(c, "Invalid JSON payload", map[string][]string{
+			"error": {err.Error()},
+		}, fiber.StatusBadRequest)
 	}
-	
-	employeePayment, err := models.AddEmployeePayment(&p)
+	p.PaidMonth = c.Query("month") 
+	// Validate required fields manually
+	if p.EmployeeID == uuid.Nil || p.PaidMonth == "" || p.Amount <= 0 {
+		return utils.NewErrorResponse(c, "Missing required payment fields", map[string][]string{
+			"employee_id": {"Employee ID is required"},
+			"paid_month":  {"Paid month is required in YYYY-MM format"},
+			"amount":      {"Amount must be greater than 0"},
+		}, fiber.StatusBadRequest)
+	}
+
+	// Save the payment
+	employeePayment, err := models.AddEmployeePayment(c,&p)
 	if err != nil {
-		return utils.NewErrorResponse(c,"failed to add employee payment",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+		return utils.NewErrorResponse(c, "Failed to add employee payment", map[string][]string{
+			"error": {err.Error()},
+		}, fiber.StatusBadRequest)
 	}
-	return utils.SuccessResponse(c,"Employee payment created successfully",employeePayment)
+
+	// Return success response
+	return utils.SuccessResponse(c, "Employee payment created successfully", employeePayment)
 }
 
 func UpdateEmployeePayment(c *fiber.Ctx)error{
@@ -54,3 +72,16 @@ func GetRecentPaymentsHandler(c *fiber.Ctx)error{
 	}
 	return utils.SuccessResponse(c,"Employee payment retrieved successfully",employeePayment)
 }
+
+//get payroll
+func GetPayrollReportHandler(c *fiber.Ctx) error {
+	month := c.Query("month")
+
+	report, err := models.GetReport(month)
+	if err != nil {
+		utils.NewErrorResponse( c, "Failed to get report", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+	}
+
+	return utils.SuccessResponse(c, "Report retrieved successfully", report)
+}
+

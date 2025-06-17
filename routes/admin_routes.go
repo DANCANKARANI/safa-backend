@@ -92,5 +92,19 @@ func SetAdminRoutes(app *fiber.App) {
 	nozzles.Post("/", controllers.CreateNozzleHandler)
 	nozzles.Patch("/:id", controllers.UpdateNozzleHandler)
 	nozzles.Delete("/:id", controllers.DeleteNozzleHandler)
+
+	//payments
+	payments := g.Group("/admin/payments")
+	
+	payments.Post("/", controllers.AddNewEmployeePayment)
+	payments.Get("/report", controllers.GetPayrollReportHandler)
+
+	//fuel stock
+	stock := g.Group("/admin/stock")
+	stock.Get("/", controllers.GetFuelStockHandler)
+
+	//supplier payments
+	payment := g.Group("/admin/supplier-payments")
+	payment.Post("/", controllers.AddSupplierPayments)
 }
 

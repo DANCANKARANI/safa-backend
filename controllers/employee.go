@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/dancankarani/safa/models"
+	"github.com/dancankarani/safa/repositories"
 	"github.com/dancankarani/safa/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -17,6 +18,16 @@ func CreateEmployee(c *fiber.Ctx) error {
 		log.Println("failed to parse json data", err.Error())
 		err_str["error"] = []string{"failed to parse json data"}
 		return utils.NewErrorResponse(c, "failed to parse json data", err_str, fiber.StatusBadRequest)
+	}
+	//check if employee with this email alredy exist
+	exists, err := repositories.EmployeeExists(employee.Email)
+	if err != nil {
+		err_str["error"] = []string{err.Error()}
+		return utils.NewErrorResponse(c, "failed to check employee existence", err_str, fiber.StatusBadRequest)
+	}
+	if exists {
+		err_str["error"] = []string{"employee with this email already exist"}
+		return utils.NewErrorResponse(c, "employee with this email already exist", err_str, fiber.StatusBadRequest)
 	}
 	if _, err := models.CreateEmployee(c, &employee); err != nil {
 		log.Println("failed to add employee", err.Error())

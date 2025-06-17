@@ -20,7 +20,7 @@ func AddNewStation (c *fiber.Ctx, station Station) (*Station,error) {
 
 func GetStationByID(c* fiber.Ctx, id uuid.UUID) (*Station, error) {
 	var station Station
-	if err := db.Where("id = ?", id).First(&station).Error; err != nil {
+	if err := db.Preload("Expenses").Preload("Tanks.Pumps.Nozzles.Sales").Where("id = ?", id).First(&station).Error; err != nil {
 		return nil, errors.New("failed to get station by id")
 	}
 	return &station, nil

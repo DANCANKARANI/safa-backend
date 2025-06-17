@@ -29,6 +29,6 @@ func SetEmployeeRoutes(app *fiber.App) {
 	e.Patch("/pump-readings/:id", controllers.UpdatePumpReadingsHandler)
 	e.Delete("/pump-readings/:id", controllers.DeletePumpReadingsHandler)
 
-	e.Get("/sales/date/:start_date/:end_date", controllers.GetAllSalesByDateHandler)
+	e.Get("/sales/", controllers.GetAllSalesByDateHandler)
 	
 }

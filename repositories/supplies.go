@@ -11,55 +11,64 @@ import (
 
 func RecordSupply(db *gorm.DB, supply models.Supply) error {
     return db.Transaction(func(tx *gorm.DB) error {
-       
+        // 1. Save the supply record
+        
+        if err := tx.Create(&supply).Error; err != nil {
+            return err
+        }
 
         // 2. Get current credit balance
         var supplier models.Supplier
-        db.AutoMigrate(&supplier)
         if err := tx.First(&supplier, supply.SupplierID).Error; err != nil {
             return err
         }
 
-        // 3. Calculate new balance (apply any credit first)
+        // 3. Calculate new balance (apply credit)
         amountDue := supply.TotalAmount
         newBalance := supplier.CreditBalance - amountDue
 
         var debtRecord models.SupplierDebt
         if newBalance >= 0 {
-            // Fully covered by credit
+            // Fully paid from credit
             debtRecord = models.SupplierDebt{
-                ID: uuid.New(),
-                SupplierID:     supply.SupplierID,
-                SupplyID:       supply.ID,
+                ID:              uuid.New(),
+                SupplierID:      supply.SupplierID,
+                SupplyID:        supply.ID,
                 TransactionType: "supply",
-                Amount:        amountDue,
-                RunningBalance: -newBalance, // New credit balance
-                Notes:         fmt.Sprintf("Paid from credit. Remaining credit: %.2f", newBalance),
+                Amount:          amountDue,
+                RunningBalance:  newBalance,
+                Notes:           fmt.Sprintf("Paid fully from credit. New balance: %.2f", newBalance),
             }
             supplier.CreditBalance = newBalance
         } else {
-            // Partial credit, create debt
+            // Credit insufficient — create debt
             debtRecord = models.SupplierDebt{
-                ID: uuid.New(),
-                SupplierID:     supply.SupplierID,
-                SupplyID:       supply.ID,
+                ID:              uuid.New(),
+                SupplierID:      supply.SupplierID,
+                SupplyID:        supply.ID,
                 TransactionType: "supply",
-                Amount:        amountDue,
-                RunningBalance: -newBalance, // Positive = debt
-                Notes:         fmt.Sprintf("Applied credit: %.2f", supplier.CreditBalance),
+                Amount:          amountDue,
+                RunningBalance:  -newBalance, // debt is positive
+                Notes:           fmt.Sprintf("Applied credit: %.2f, remaining debt: %.2f", supplier.CreditBalance, -newBalance),
             }
             supplier.CreditBalance = 0
         }
 
-        // 4. Update supplier and create debt record
+        // 4. Update supplier credit balance
         if err := tx.Model(&supplier).Update("credit_balance", supplier.CreditBalance).Error; err != nil {
             return err
         }
+
+        // 5. Record supplier debt
         if err := tx.Create(&debtRecord).Error; err != nil {
             return err
         }
 
-        // 5. Update fuel stock
+        // 6. Update fuel stock using helper
+        if err := UpdateFuelStock(tx, supply.TankID, supply.StationID, supply.FuelProductID, supply.Quantity, "in"); err != nil {
+            return err
+        }
+        // 7. Add fuel transaction
         return AddFuelTransaction(tx, "supply", supply.FuelProductID, supply.StationID, supply.Quantity, supply.ID, supply.EmployeeID)
     })
 }
@@ -67,16 +76,11 @@ func RecordSupply(db *gorm.DB, supply models.Supply) error {
 
 func RecordSupplierPayment(db *gorm.DB, payment models.SupplierPayment) error {
     return db.Transaction(func(tx *gorm.DB) error {
-        // Validate
         if payment.Amount <= 0 {
             return fmt.Errorf("invalid payment amount")
         }
 
         payment.ID = uuid.New()
-        if err := tx.AutoMigrate(&models.SupplierPayment{}); err != nil {
-            return err
-        }
-
         if err := tx.Create(&payment).Error; err != nil {
             return err
         }
@@ -89,10 +93,18 @@ func RecordSupplierPayment(db *gorm.DB, payment models.SupplierPayment) error {
         var currentDebt struct {
             Balance float64
         }
-        tx.Model(&models.SupplierDebt{}).
-            Select("COALESCE(MAX(running_balance), 0) as balance").
+
+        // Get net debt (supplies - payments)
+        err := tx.Model(&models.SupplierDebt{}).
+            Select(`COALESCE(SUM(CASE 
+                WHEN transaction_type = 'supply' THEN amount 
+                WHEN transaction_type = 'payment' THEN -amount 
+                ELSE 0 END), 0) as balance`).
             Where("supplier_id = ?", payment.SupplierID).
-            Scan(&currentDebt)
+            Scan(&currentDebt).Error
+        if err != nil {
+            return err
+        }
 
         newBalance := currentDebt.Balance - payment.Amount
         notes := ""
@@ -110,7 +122,7 @@ func RecordSupplierPayment(db *gorm.DB, payment models.SupplierPayment) error {
             ID:              uuid.New(),
             SupplierID:      payment.SupplierID,
             TransactionType: "payment",
-            Amount:          payment.Amount, // Store as positive for clarity
+            Amount:          payment.Amount,
             RunningBalance:  newBalance,
             Notes:           notes,
         }

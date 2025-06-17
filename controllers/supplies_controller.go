@@ -32,7 +32,6 @@ func UpdateSupplyHandler(c *fiber.Ctx)error{
 	}
 	return utils.SuccessResponse(c,"Supply updated successfully", updatedSupply)
 }
-
 //delete supply
 func DeleteSupplyHandler(c *fiber.Ctx)error{
 	id, _ := uuid.Parse(c.Params("id"))

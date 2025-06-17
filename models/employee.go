@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"time"
-
 	"github.com/dancankarani/safa/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -86,7 +85,9 @@ func CreateEmployee(c *fiber.Ctx, e *Employee)( *Employee, error) {
 	
 	e.Password = hashed_password
 
+
 	if err := db.Create(e).Error; err != nil {
+		log.Println(err.Error())
 		return nil, errors.New("failed to create employee")
 	}
 	log.Println("Pasword:", password)
@@ -95,19 +96,35 @@ func CreateEmployee(c *fiber.Ctx, e *Employee)( *Employee, error) {
 
 func GetEmployeeByID(c *fiber.Ctx, id uuid.UUID) (*Employee, error) {
 	var employee Employee
-	if err := db.First(&employee, "id = ?", id).Error; err != nil {
+	if err := db.Preload("Station").
+		Preload("Payments").
+		Preload("SalaryAdvance").
+
+		First(&employee, "id = ?", id).Error; err != nil {
 		return nil, errors.New("Employee not found")
 	}
 	return &employee, nil
 }
+type ResEmployees struct {
+	Employees []Employee `json:"employees"`
+	Count     int        `json:"count"`
+}
 
-func GetAllEmployees(c *fiber.Ctx) ([]Employee, error) {
+func GetAllEmployees(c *fiber.Ctx) (*ResEmployees, error) {
 	var employees []Employee
-	if err := db.Find(&employees).Error; err != nil {
+	if err := db.Preload("Station").
+		Preload("Payments").
+		Preload("SalaryAdvance").
+		Find(&employees).Error; err != nil {
 		return nil, errors.New("failed to retrieve employees")
 	}
-	return employees, nil
+
+	return &ResEmployees{
+		Employees: employees,
+		Count:     len(employees),
+	}, nil
 }
+
 
 func UpdateEmployee(c *fiber.Ctx, id uuid.UUID, updatedData *Employee) (*Employee, error) {
 	var employee Employee

@@ -107,16 +107,42 @@ type ResSales struct {
 	TotalLiters float64
 }
 
-func GetTotalSalesByDate(c *fiber.Ctx, startDate, endDate time.Time) (*ResSales, error) {
+func GetTotalSalesByDate(c *fiber.Ctx) (*ResSales, error) {
+	// Parse date query params
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+
+	var startDate, endDate time.Time
+	var err error
+
+	// If dates not provided, use today's range
+	if startDateStr == "" || endDateStr == "" {
+		today := time.Now()
+		startDate = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+		endDate = time.Date(today.Year(), today.Month(), today.Day(), 23, 59, 59, 999999999, today.Location())
+	} else {
+		startDate, err = time.Parse("2006-01-02", startDateStr)
+		if err != nil {
+			return nil, errors.New("invalid start_date format, expected YYYY-MM-DD")
+		}
+		endDate, err = time.Parse("2006-01-02", endDateStr)
+		if err != nil {
+			return nil, errors.New("invalid end_date format, expected YYYY-MM-DD")
+		}
+		endDate = endDate.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	}
+
 	var res ResSales
 	if err := db.Model(&PumpReadings{}).
-		Where("created_at >= ? AND created_at <= ?", startDate, endDate).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Select("COALESCE(SUM(total_sales_amount), 0) as total_sales, COALESCE(SUM(liters_dispensed), 0) as total_liters").
 		Scan(&res).Error; err != nil {
 		log.Println(err.Error())
 		return nil, errors.New("failed to get total sales by date")
 	}
+
 	return &res, nil
 }
+
 
 //get total sales per station

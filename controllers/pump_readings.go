@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"time"
-
 	"github.com/dancankarani/safa/models"
 	"github.com/dancankarani/safa/utils"
 	"github.com/gofiber/fiber/v2"
@@ -71,23 +69,8 @@ func GetOrderedPumpReadingsHandler(c *fiber.Ctx) error {
 //get all sales by date
 
 func GetAllSalesByDateHandler(c *fiber.Ctx) error {
-	start_date := c.Params("start_date")
-	start, err := utils.ParseDate(start_date)
-	if err != nil {
-		return utils.NewErrorResponse(c, "Invalid date format", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
-	}
-
-	end_date := c.Params("end_date")
-	end, err := utils.ParseDate(end_date)
-	if err != nil {
-		return utils.NewErrorResponse(c, "Invalid date format", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
-	}
-
-	// Normalize start to 00:00:00 and end to 23:59:59.999
-	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
-	end = time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), end.Location())
-
-	sales, err := models.GetTotalSalesByDate(c, start, end)
+	
+	sales, err := models.GetTotalSalesByDate(c)
 	if err != nil {
 		return utils.NewErrorResponse(c, "Failed to get sales", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}

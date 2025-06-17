@@ -86,3 +86,12 @@ func GetAllSupplierBalancesHandler(c *fiber.Ctx)error{
 	}
 	return utils.SuccessResponse(c, "Supplier balances retrieved successfully", data)
 }
+
+//add supplier payments
+func AddSupplierPayments(c *fiber.Ctx)error{
+	payment, error := repositories.AddSupplierPayments(c)
+	if error != nil {
+		return utils.NewErrorResponse(c, "Failed to add supplier payment", map[string][]string{"error": {error.Error()}}, fiber.StatusBadRequest)
+	}
+	return utils.SuccessResponse(c, "Supplier payment added successfully", payment)
+}

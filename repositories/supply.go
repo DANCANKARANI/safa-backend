@@ -1,7 +1,6 @@
 package repositories
 
 import (
-	"errors"
 	"log"
 
 	"github.com/dancankarani/safa/models"
@@ -18,10 +17,7 @@ func AddNewSupply(c *fiber.Ctx)(*models.Supply, error){
 		return nil, err
 	}
 	supply.ID = uuid.New()
-	if err := db.Create(&supply).Error; err != nil {
-		log.Println(err.Error())
-		return nil,errors.New("failed to add supply")
-	}
+	
 	
 	//update the supplier debts
 	err := RecordSupply(db, *supply)
@@ -112,3 +108,23 @@ func GetAllSupplies(c *fiber.Ctx) (*[]models.Supply, error) {
 	return &supplies, nil
 }
 
+
+//supplier payments
+func AddSupplierPayments(c *fiber.Ctx)(*models.SupplierPayment, error){
+	var payment models.SupplierPayment
+	
+	if err := c.BodyParser(&payment); err != nil {
+		return nil, err
+	}
+	payment.ID = uuid.New()
+	
+	
+	//update the supplier debts
+	err := RecordSupplierPayment(db, payment)
+	if err != nil {
+		//rollback
+		return nil, err
+	}
+
+	return &payment, nil
+}

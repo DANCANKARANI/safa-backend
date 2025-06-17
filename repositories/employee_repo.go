@@ -11,7 +11,10 @@ var db = database.ConnectDB()
 
 func GetEmployeeById(id int) (models.Employee, error) {
 	var employee models.Employee
-	if err := db.First(&employee, id).Error; err != nil {
+	if err := db.Preload("Station").
+		Preload("Payment").
+		Preload("SalaryAdvance").
+		First(&employee, id).Error; err != nil {
 		return models.Employee{}, err
 	}
 	return employee, nil

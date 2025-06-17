@@ -4,7 +4,9 @@ func MigrateDb(){
 	// Perform database migration tasks here
 	db.AutoMigrate(
 		&Dippings{},
+		&FuelStock{},
 		&Employee{},
+		&Payment{},
 		&Supplier{},
 		&SalaryAdvance{},
 		&SupplierPayment{},
@@ -14,7 +16,7 @@ func MigrateDb(){
 		&FuelProduct{},
 		&PumpReadings{},
 		&FuelTransaction{},
-		&Payment{},
+		
 		&Sales{},
 		&Supply{},
 		&Pump{},

@@ -54,3 +54,4 @@ func GetStationExpensesHandler(c *fiber.Ctx)error{
 	}
 	return utils.SuccessResponse(c,"Expenses retrieved successfully", expenses)
 }
+
