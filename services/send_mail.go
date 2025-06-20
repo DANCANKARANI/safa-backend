@@ -4,14 +4,21 @@ import (
 	"fmt"
 	"net/mail"
 	"net/smtp"
+	"os"
+
+	"github.com/joho/godotenv"
 )
 
 func SendEmail(to, subject, body string) error {
-	// 1. Configure SMTP settings (use environment variables!)
-	from := "karanidancan120@gmail.com"
-	password := "uyct osxl wphg ymdg" // ⚠️ Never hardcode passwords!
+	// 1. Get email configuration
+	err := godotenv.Load(".env")
+	if err != nil {
+		return fmt.Errorf("failed to load .env file: %v", err)
+	}
+	from := os.Getenv("EMAIL")
+	password := os.Getenv("SMTP_PASSWORD")
 	smtpHost := "smtp.gmail.com"
-	smtpPort := "587"
+	smtpPort := os.Getenv("SMTP_PORT")
 
 	// 2. Validate email format
 	if _, err := mail.ParseAddress(to); err != nil {
@@ -27,12 +34,12 @@ func SendEmail(to, subject, body string) error {
 			"To: " + to + "\r\n" +
 			"Subject: " + subject + "\r\n" +
 			"MIME-Version: 1.0\r\n" +
-			"Content-Type: text/plain; charset=UTF-8\r\n" +
+			"Content-Type: text/html; charset=UTF-8\r\n" +
 			"\r\n" + body + "\r\n",
 	)
 
 	// 5. Send the email
-	err := smtp.SendMail(
+	err = smtp.SendMail(
 		smtpHost+":"+smtpPort,
 		auth,
 		from,

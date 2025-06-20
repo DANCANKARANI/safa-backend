@@ -10,25 +10,18 @@ import (
 	"gorm.io/gorm"
 )
 
-func (p *PumpReadings) BeforeSave(tx *gorm.DB) (err error) {
-	p.TotalSalesAmount = p.ClosingSalesAmount - p.OpeningSalesAmount
-	p.LitersDispensed = p.ClosingMeter - p.OpeningMeter
+func (p *PumpReadings) BeforeSave(tx *gorm.DB) (err error) { 
+	p.LitersDispensed = p.OpeningMeter - p.ClosingMeter
+	p.TotalSalesAmount =   p.LitersDispensed * p.UnitPrice
+	p.BankDeposit = p.TotalSalesAmount- p.MpesaAmount
 	return nil
 }
 
-func (p *PumpReadings) BeforeCreate(tx *gorm.DB) (err error) {
-	p.ID = uuid.New()
-	return
-}
 
-func AddPumpReadings(c *fiber.Ctx, pumpReadings PumpReadings)(*PumpReadings, error) {
-	db.AutoMigrate(&PumpReadings{})
-	err := db.Create(&pumpReadings).Error
-	if err != nil {
-		return nil, err
-	}
-	return &pumpReadings, nil
-}
+
+
+
+
 
 
 func UpdatePumpReadings(c *fiber.Ctx,id uuid.UUID, updatedReadings PumpReadings)(*PumpReadings, error) {
@@ -53,8 +46,12 @@ func UpdatePumpReadings(c *fiber.Ctx,id uuid.UUID, updatedReadings PumpReadings)
 		pumpReadings.ClosingMeter = updatedReadings.ClosingMeter
 	}
 	
-	pumpReadings.ReadingDate = updatedReadings.ReadingDate
-	pumpReadings.Shift = updatedReadings.Shift
+	if !updatedReadings.ReadingDate.IsZero() {
+		pumpReadings.ReadingDate = updatedReadings.ReadingDate
+	}
+	if updatedReadings.Shift != ""{
+		pumpReadings.ReadingDate = updatedReadings.ReadingDate
+	}
 	
 	err = db.Save(&pumpReadings).Error
 	if err != nil {
@@ -103,8 +100,10 @@ func DeletePumpReadings(c *fiber.Ctx, id uuid.UUID) error {
 }
 // get total sales for a date range
 type ResSales struct {
-	TotalSales  float64
-	TotalLiters float64
+	TotalSales  float64 `json:"total_sales"`
+	TotalLiters float64	`json:"total_liters"`
+	MpesaAmount float64	`json:"mpesa_amount"`
+	BankDeposit float64	`json:"bank_deposit"`
 }
 
 func GetTotalSalesByDate(c *fiber.Ctx) (*ResSales, error) {
@@ -117,25 +116,39 @@ func GetTotalSalesByDate(c *fiber.Ctx) (*ResSales, error) {
 
 	// If dates not provided, use today's range
 	if startDateStr == "" || endDateStr == "" {
-		today := time.Now()
-		startDate = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
-		endDate = time.Date(today.Year(), today.Month(), today.Day(), 23, 59, 59, 999999999, today.Location())
+		now := time.Now()
+		
+		// startDate: today at 8:00 AM
+		startDate = time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, now.Location())
+		
+		// endDate: tomorrow at 8:00 AM
+		endDate = startDate.Add(24 * time.Hour)
 	} else {
+		// parse startDate from user input (expected YYYY-MM-DD)
 		startDate, err = time.Parse("2006-01-02", startDateStr)
 		if err != nil {
 			return nil, errors.New("invalid start_date format, expected YYYY-MM-DD")
 		}
+		startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 8, 0, 0, 0, startDate.Location())
+		
+		// parse endDate from user input (expected YYYY-MM-DD)
 		endDate, err = time.Parse("2006-01-02", endDateStr)
 		if err != nil {
 			return nil, errors.New("invalid end_date format, expected YYYY-MM-DD")
 		}
-		endDate = endDate.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+		endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 8, 0, 0, 0, endDate.Location()).Add(24 * time.Hour)
 	}
+
 
 	var res ResSales
 	if err := db.Model(&PumpReadings{}).
-		Where("created_at BETWEEN ? AND ?", startDate, endDate).
-		Select("COALESCE(SUM(total_sales_amount), 0) as total_sales, COALESCE(SUM(liters_dispensed), 0) as total_liters").
+		Where("reading_date BETWEEN ? AND ?", startDate, endDate).
+		Select(`
+			COALESCE(SUM(total_sales_amount), 0) as total_sales, 
+			COALESCE(SUM(liters_dispensed), 0) as total_liters, 
+			COALESCE(SUM(mpesa_amount), 0) as mpesa_amount,
+			COALESCE(SUM(bank_deposit), 0) as bank_deposit
+		`).
 		Scan(&res).Error; err != nil {
 		log.Println(err.Error())
 		return nil, errors.New("failed to get total sales by date")
@@ -143,6 +156,5 @@ func GetTotalSalesByDate(c *fiber.Ctx) (*ResSales, error) {
 
 	return &res, nil
 }
-
 
 //get total sales per station

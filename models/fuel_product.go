@@ -52,9 +52,16 @@ func UpdateFuelProduct(c *fiber.Ctx, id uuid.UUID, updatedData *FuelProduct) (*F
 	if err := db.First(&product, "id = ?", id).Error; err != nil {
 		return nil, errors.New("fuel product not found")
 	}
-	product.Name = updatedData.Name
-	product.Description = updatedData.Description
-	product.PricePerLiter = updatedData.PricePerLiter
+	if updatedData.Name != "" {
+		product.Name = updatedData.Name
+	}
+	if updatedData.Description != "" {
+		product.Description = updatedData.Description
+	}
+	if updatedData.UnitPrice != 0 {
+		product.UnitPrice = updatedData.UnitPrice
+	}
+	
 	if err := db.Save(&product).Error; err != nil {
 		return nil, errors.New("failed to update fuel product")
 	}

@@ -109,3 +109,61 @@ func UnassignPumpFromTank(c *fiber.Ctx, tankID uuid.UUID, pumpID uuid.UUID) erro
 
 	return nil
 }
+
+type PumpInput struct {
+	Name      string    `json:"name"`
+	StationID uuid.UUID `json:"station_id"`
+}
+
+type CreateTankWithPumpsInput struct {
+	TankName      string      `json:"name"`
+	Capacity      float64     `json:"capacity"`
+	StationID     uuid.UUID   `json:"station_id"`
+	FuelProductID uuid.UUID   `json:"fuel_product_id"`
+	Pumps         []PumpInput `json:"pumps"`
+}
+
+func CreateTankWithPumps(c *fiber.Ctx) error {
+	var input CreateTankWithPumpsInput
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid input"})
+	}
+
+	tank := Tank{
+		ID:            uuid.New(),
+		Name:          input.TankName,
+		Capacity:      input.Capacity,
+		StationID:     input.StationID,
+		FuelProductID: input.FuelProductID,
+	}
+
+	if err := db.Create(&tank).Error; err != nil {
+		log.Println("Failed to create tank:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create tank"})
+	}
+
+	var createdPumps []Pump
+	for _, p := range input.Pumps {
+		newPump := Pump{
+			ID:        uuid.New(),
+			Name:      p.Name,
+			StationID: p.StationID,
+		}
+		if err := db.Create(&newPump).Error; err != nil {
+			log.Println("Failed to create pump:", err)
+			continue
+		}
+		createdPumps = append(createdPumps, newPump)
+	}
+
+	if err := db.Model(&tank).Association("Pumps").Append(&createdPumps); err != nil {
+		log.Println("Failed to assign pumps:", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to assign pumps"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "Tank and pumps created successfully",
+		"tank":    tank,
+		"pumps":   createdPumps,
+	})
+}

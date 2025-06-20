@@ -15,7 +15,7 @@ type Employee struct {
 	LastName  string	`json:"last_name" gorm:"size:100"`
 	Position  string	`json:"position" gorm:"size:100"`
 	PhoneNumber string	`json:"phone_number" gorm:"size:15"`
-	Email     string	`json:"email" gorm:"size:100;unique"`
+	Email     string	`json:"email" gorm:"size:100"`
 	StationID uuid.UUID `json:"station_id" gorm:"type:varchar(36);not null"`
 	CanLogin  bool 		`json:"can_login" gorm:"default:false"`
 	Password  string	`json:"password" gorm:"size:255"`
@@ -24,6 +24,8 @@ type Employee struct {
 	DateJoined 	time.Time 		`json:"date_joined" `
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+
 	Station		Station			`json:"station" gorm:"foreignKey:StationID;references:ID;constraint:OnUpdate:CASCADE"`
 	SalaryAdvance []SalaryAdvance `json:"salary_advance" gorm:"foreignKey:EmployeeID;references:ID;constraint:OnUpdate:CASCADE"`
 	Payments []Payment `json:"payments" gorm:"foreignKey:EmployeeID;references:ID;constraint:OnUpdate:CASCADE"`
@@ -39,6 +41,7 @@ type SalaryAdvance struct {
 	DateRequested time.Time `json:"date_requested" gorm:"autoCreateTime"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 type Station struct{
@@ -47,9 +50,12 @@ type Station struct{
 	Address     string    `json:"address" gorm:"size:255"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+
 	Employee	[]Employee	`json:"employees" gorm:"foreignKey:StationID;references:ID;constraint:OnUpdate:CASCADE"`
 	Expenses    []Expenses 	   `json:"expenses" gorm:"foreignKey:StationID;references:ID;constraint:OnUpdate:CASCADE"`
 	Tanks		[]Tank			`json:"tanks" gorm:"foreignKey:StationID;references:ID;constraint:OnUpdate:CASCADE"`
+
 }
 
 // Tank represents a tank at the station
@@ -59,10 +65,11 @@ type Tank struct {
 	Capacity   float64 `json:"capacity" gorm:"type:decimal(10,2);not null"`
 	FuelProductID uuid.UUID `json:"fuel_product_id" gorm:"type:varchar(36);not null"`
 	FuelProduct   FuelProduct   `json:"fuel_product" gorm:"foreignKey:FuelProductID"` // ✅ Added this line
-
 	StationID    uuid.UUID `json:"station_id" gorm:"type:varchar(36);not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+
 	Pumps      []Pump  `gorm:"many2many:tank_pumps;" json:"pumps"`
 	Dippings	[]Dippings `json:"dippings" gorm:"foreignKey:TankID;references:ID;constraint:OnUpdate:CASCADE"`
 }
@@ -72,10 +79,12 @@ type Pump struct {
 	Name       string   `json:"name" gorm:"size:100"`
 	StationID  uuid.UUID `json:"station_id" gorm:"type:varchar(36);not null"`
 	Tanks      []Tank   `gorm:"many2many:tank_pumps;" json:"tanks"`
-	Nozzles    []Nozzle `json:"nozzles" gorm:"foreignKey:PumpID;references:ID;constraint:OnUpdate:CASCADE"`
-	Readings 	[]PumpReadings `json:"readings" gorm:"foreignKey:PumpID;references:ID;constraint:OnUpdate:CASCADE"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	Nozzles    []Nozzle `json:"nozzles" gorm:"foreignKey:PumpID;references:ID;constraint:OnUpdate:CASCADE"`
+	Readings 	[]PumpReadings `json:"readings" gorm:"foreignKey:PumpID;references:ID;constraint:OnUpdate:CASCADE"`
+	Sales		[]Sales `json:"sales" gorm:"foreignKey:PumpID;references:ID;constraint:OnUpdate:CASCADE"`
 }
 // Nozzle represents a nozzle at the station
 type Nozzle struct {
@@ -84,7 +93,7 @@ type Nozzle struct {
 	PumpID      uuid.UUID `json:"pump_id" gorm:"type:varchar(36);not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
-	Sales		[]Sales `json:"sales" gorm:"foreignKey:NozzleID;references:ID;constraint:OnUpdate:CASCADE"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 // FuelProduct represents a fuel product available at the station
@@ -92,10 +101,12 @@ type FuelProduct struct {
 	ID          uuid.UUID `json:"id" gorm:"type:varchar(36);"`
 	Name        string    `json:"name" gorm:"size:100"`
 	Description string    `json:"description" gorm:"size:255"`
-	PricePerLiter float64   `json:"price" gorm:"type:decimal(10,2);not null"`
+	UnitPrice float64   `json:"unit_price" gorm:"type:decimal(10,2);not null"`
 	EffectiveFrom	time.Time `json:"effective_at" gorm:"not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+
 	Tanks		[]Tank			`json:"tanks" gorm:"foreignKey:FuelProductID;references:ID;constraint:OnUpdate:CASCADE"`
 }
 
@@ -114,6 +125,7 @@ type FuelTransaction struct {
     CreatedBy    uuid.UUID `json:"created_by" gorm:"type:varchar(36);not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt    *gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 
@@ -129,6 +141,8 @@ type Supplier struct {
 	CreditBalance float64 `json:"credit_balance" gorm:"type:decimal(10,2);default:0"` // Tracks overpayments
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+
 	Debts SupplierDebt `json:"supplier_debts" gorm:"foreignKey:SupplierID;references:ID;constraint:OnUpdate:CASCADE,"`
 }
 
@@ -148,6 +162,8 @@ type Supply struct {
 	DeliveryDate  time.Time `json:"delivery_date" gorm:"not null"`                     // Date delivered
 	IsPaid        bool      `json:"is_paid" gorm:"default:false"`                      // Settled or not
 	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`                  // Auto timestamp
+	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 
@@ -162,6 +178,7 @@ type SupplierDebt struct {
 	Notes           string    `json:"notes" gorm:"size:255"`
 	CreatedAt       time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt       time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 //supplier payments
@@ -173,19 +190,21 @@ type SupplierPayment struct {
     Method      string    `json:"method" gorm:"size:20"` // "cash", "transfer", etc.
     Reference   string    `json:"reference" gorm:"size:100"` // Payment reference
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 // Sales represents sales of fuel products
 type Sales struct {
 	ID          uuid.UUID `json:"id" gorm:"type:varchar(36)"`
 	EmployeeID  uuid.UUID `json:"employee_id" gorm:"type:varchar(36);"`
-	NozzleID     uuid.UUID `json:"nozzle_id" gorm:"type:varchar(36);not null"`
-	
+	PumpID     uuid.UUID `json:"pump_id" gorm:"type:varchar(36);not null"`
 	LitersSold    float64       `json:"liters_sold" gorm:"type:decimal(10,2);not null"`
 	PricePerLiter float64       `json:"price_per_liter" gorm:"type:decimal(10,2);not null"`
 	TotalAmount   float64       `json:"total_amount" gorm:"type:decimal(10,2);not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 // Dippings represents the dippings of fuel products at a station
@@ -198,6 +217,7 @@ type Dippings struct {
 	LitersDispensed float64    `json:"liters_dispensed" gorm:"type:decimal(10,2);not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 // Expenses represents expenses incurred by the station
@@ -210,6 +230,7 @@ type Expenses struct {
 	ExpenseDate time.Time `json:"expense_date" gorm:"autoCreateTime"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 // Payments represents payments made to employees
 type Payment struct {
@@ -222,6 +243,7 @@ type Payment struct {
 	EmployeeID  uuid.UUID `json:"employee_id" gorm:"type:varchar(36);not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 type PumpReadings struct {
@@ -236,9 +258,12 @@ type PumpReadings struct {
 	ClosingSalesAmount float64   `json:"closing_sales_amount" gorm:"type:decimal(10,2);not null"`
 	TotalSalesAmount  float64   `json:"total_sales_amount" gorm:"type:decimal(10,2);not null"`
 	UnitPrice	 float64   `json:"unit_price" gorm:"type:decimal(10,2);not null"`
+	MpesaAmount	float64		`json:"mpesa_amount" gorm:"type:decimal(10,2);not null"`
+	BankDeposit		float64		`json:"cash_amount" gorm:"type:decimal(10,2);not null"`
 	RecordedBy  uuid.UUID `json:"recorded_by" gorm:"type:varchar(36);not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 }
 
 type FuelStock struct {
@@ -248,6 +273,9 @@ type FuelStock struct {
     StationID     uuid.UUID `json:"station_id" gorm:"not null"`
     CurrentVolume float64   `json:"current_volume" gorm:"type:decimal(10,2)"`
     LastUpdated   time.Time `json:"last_updated" gorm:"autoUpdateTime"`
+	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 
     // Relationships
     FuelProduct   FuelProduct `json:"fuel_product" gorm:"foreignKey:FuelProductID;references:ID"`

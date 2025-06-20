@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/dancankarani/safa/controllers"
+	"github.com/dancankarani/safa/models"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -84,6 +85,10 @@ func SetAdminRoutes(app *fiber.App) {
 	pumps.Delete("/:id", controllers.DeletePumpHandler)
 	pumps.Post("/:tank_id/:pump_id", controllers.AssignPumpToTankHandler)
 	pumps.Delete("/:tank_id/:pump_id", controllers.ReassignPumpToTankHandler)
+
+	//create tank with pumps
+	tanksWithPumps := g.Group("/admin/tanks-with-pumps")
+	tanksWithPumps.Post("/", models.CreateTankWithPumps)
 
 	//nozzles
 	nozzles := g.Group("/admin/nozzles")

@@ -11,7 +11,7 @@ func RegisterEndpoint() {
     // Enable CORS with default config (allows all origins)
     app.Use(cors.New(cors.Config{
         AllowOrigins:     "http://localhost:3000",
-        AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+        AllowMethods:     "GET,POST,PATCH,DELETE,OPTIONS",
         AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
         AllowCredentials: true,
     }))

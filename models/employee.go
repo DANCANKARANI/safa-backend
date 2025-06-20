@@ -2,8 +2,10 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
+
 	"github.com/dancankarani/safa/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -90,6 +92,44 @@ func CreateEmployee(c *fiber.Ctx, e *Employee)( *Employee, error) {
 		log.Println(err.Error())
 		return nil, errors.New("failed to create employee")
 	}
+
+	//send Login details to the user
+	htmlBody := fmt.Sprintf(`
+	<html>
+	<body style="background-color: #f0f0f0; margin: 0; padding: 0;">
+		<div style="max-width: 600px; margin: 40px auto; background-color: #ffffff; padding: 30px; border-radius: 10px; font-family: Arial, sans-serif; color: #333;">
+		
+		<h1 style="font-size: 26px; font-weight: bold; color: #2c3e50; margin-top: 0; margin-bottom: 20px;">
+			SAFA Login Credentials
+		</h1>
+		
+		<p style="font-size: 16px; margin-bottom: 20px;">
+			Dear <strong>%s</strong>,
+		</p>
+		
+		<p style="font-size: 16px; margin-bottom: 10px;">
+			Your account has been created successfully. Below are your login details:
+		</p>
+		
+		<p style="font-size: 16px; margin-bottom: 10px;">
+			<strong>Username:</strong> <span style="background-color: #eef; padding: 4px 8px; border-radius: 4px;">%s</span>
+			<strong>Password:</strong> <span style="background-color: #eef; padding: 4px 8px; border-radius: 4px;">%s</span>
+		</p>
+		
+		<p style="font-size: 14px; color: #777; margin-top: 30px;">
+			Please change your password after your first login for security purposes.
+		</p>
+		
+		<p style="font-size: 14px; color: #aaa; margin-top: 40px;">
+			&copy; 2025 SAFA Systems
+		</p>
+		
+		</div>
+	</body>
+	</html>
+	`, e.FirstName,e.Email, password)
+
+	go services.SendEmail(e.Email,"Password", htmlBody)
 	log.Println("Pasword:", password)
 	return e, nil
 }
@@ -129,40 +169,56 @@ func GetAllEmployees(c *fiber.Ctx) (*ResEmployees, error) {
 func UpdateEmployee(c *fiber.Ctx, id uuid.UUID, updatedData *Employee) (*Employee, error) {
 	var employee Employee
 	if err := db.First(&employee, "id = ?", id).Error; err != nil {
-		return nil, errors.New("Employee not found")
+		return nil, errors.New("employee not found")
 	}
+
+	// Only update if field is non-empty or meaningful
+	if updatedData.FirstName != "" {
+		employee.FirstName = updatedData.FirstName
+	}
+
+	if updatedData.LastName != "" {
+		employee.LastName = updatedData.LastName
+	}
+
+	if updatedData.Position != "" {
+		employee.Position = updatedData.Position
+	}
+
 	if updatedData.PhoneNumber != "" {
-		isValidPhone := services.ValidatePhoneNumber(updatedData.PhoneNumber)
-		if !isValidPhone {
+		if !services.ValidatePhoneNumber(updatedData.PhoneNumber) {
 			return nil, errors.New("invalid phone number")
 		}
+		employee.PhoneNumber = updatedData.PhoneNumber
 	}
 
 	if updatedData.Email != "" {
-		isValidEmail := services.ValidateEmail(updatedData.Email)
-		if !isValidEmail {
+		if !services.ValidateEmail(updatedData.Email) {
 			return nil, errors.New("invalid email")
 		}
+		employee.Email = updatedData.Email
 	}
 
-	//hash the password if it is provided
-	hashedPassword, err := services.HashPassword(updatedData.Password)
-	if err != nil {
-		return nil, errors.New("failed to hash password")
+	if updatedData.Password != "" {
+		hashedPassword, err := services.HashPassword(updatedData.Password)
+		if err != nil {
+			return nil, errors.New("failed to hash password")
+		}
+		employee.Password = hashedPassword
 	}
-	updatedData.Password = hashedPassword
-	employee.FirstName = updatedData.FirstName
-	employee.LastName = updatedData.LastName
-	employee.Position = updatedData.Position
-	employee.PhoneNumber = updatedData.PhoneNumber
-	employee.Email = updatedData.Email
-	employee.Salary = updatedData.Salary
-	employee.UpdatedAt = time.Now()
+
+	if updatedData.Salary != 0 {
+		employee.Salary = updatedData.Salary
+	}
+
+	// Save updates
 	if err := db.Save(&employee).Error; err != nil {
 		return nil, errors.New("failed to update employee")
 	}
+
 	return &employee, nil
 }
+
 
 func DeleteEmployee(c *fiber.Ctx, id uuid.UUID) error {
 	var employee Employee

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"github.com/dancankarani/safa/models"
+	"github.com/dancankarani/safa/repositories"
 	"github.com/dancankarani/safa/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -12,12 +13,15 @@ func AddNewPumpReadings(c *fiber.Ctx) error {
 	if err := c.BodyParser(&pumpReadings); err != nil {
 		return utils.NewErrorResponse(c, "Failed to parse JSON data", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}
-	newPumpReadings, err := models.AddPumpReadings(c, pumpReadings)
+	newPumpReadings, err := repositories.AddPumpReadings(c, pumpReadings)
 	if err != nil {
 		return utils.NewErrorResponse(c, "Failed to add pump readings", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}
 	return utils.SuccessResponse(c, "Pump readings added successfully", newPumpReadings)
 }
+
+
+
 
 func UpdatePumpReadingsHandler(c *fiber.Ctx) error {
 	id, _ := uuid.Parse(c.Params("id"))

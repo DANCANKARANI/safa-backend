@@ -30,5 +30,9 @@ func SetEmployeeRoutes(app *fiber.App) {
 	e.Delete("/pump-readings/:id", controllers.DeletePumpReadingsHandler)
 
 	e.Get("/sales/", controllers.GetAllSalesByDateHandler)
+
+	//send email
+	em := app.Group("/api/v1")
+	em.Post("/send-email", controllers.SendEmail)
 	
 }

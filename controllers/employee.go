@@ -1,10 +1,12 @@
 package controllers
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/dancankarani/safa/models"
 	"github.com/dancankarani/safa/repositories"
+	"github.com/dancankarani/safa/services"
 	"github.com/dancankarani/safa/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -20,11 +22,7 @@ func CreateEmployee(c *fiber.Ctx) error {
 		return utils.NewErrorResponse(c, "failed to parse json data", err_str, fiber.StatusBadRequest)
 	}
 	//check if employee with this email alredy exist
-	exists, err := repositories.EmployeeExists(employee.Email)
-	if err != nil {
-		err_str["error"] = []string{err.Error()}
-		return utils.NewErrorResponse(c, "failed to check employee existence", err_str, fiber.StatusBadRequest)
-	}
+	exists, _:= repositories.EmployeeExists(employee.Email)
 	if exists {
 		err_str["error"] = []string{"employee with this email already exist"}
 		return utils.NewErrorResponse(c, "employee with this email already exist", err_str, fiber.StatusBadRequest)
@@ -94,4 +92,33 @@ func GetEmployeePaymentsAndAdvancesHandler(c *fiber.Ctx)error{
 		return utils.NewErrorResponse(c,"failed to get employee payment",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}
 	return utils.SuccessResponse(c,"Employee payment retrieved successfully",employeePayment)
+}
+
+//test send email
+type Email struct{
+	To string `json:"to"`
+	Subject string `json:"subject"`
+	Body string `json:"body"`
+}
+func SendEmail(c *fiber.Ctx) error {
+	if c.BodyParser( &Email{}) != nil {
+		return utils.NewErrorResponse(c, "Failed to parse JSON data", map[string][]string{"error": {"failed to parse json data"}}, fiber.StatusBadRequest)
+	}
+
+	htmlBody := fmt.Sprintf(`
+<html>
+  <body style="background-color: #f0f0f0; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: auto; background-color: white; padding: 20px; border-radius: 8px;">
+      <h1 style="font-size: 28px; font-weight: bold; color: #2c3e50; margin-bottom: 16px;">
+        %s
+      </h1>
+      <p style="font-size: 16px; color: #333;">%s</p>
+    </div>
+  </body>
+</html>`, c.FormValue("subject"), c.FormValue("body"))
+
+	if err := services.SendEmail(c.FormValue("to"), c.FormValue("subject"),htmlBody ); err != nil {
+		return utils.NewErrorResponse(c, "Failed to send email", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+	}
+	return utils.SendMessage(c, "Email sent successfully")
 }
