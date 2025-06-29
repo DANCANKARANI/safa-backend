@@ -2,12 +2,13 @@ package routes
 
 import (
 	"github.com/dancankarani/safa/controllers"
+	"github.com/dancankarani/safa/middleware"
 	"github.com/gofiber/fiber/v2"
 )
 
 func SetEmployeeRoutes(app *fiber.App) {
 	// Define the routes for employee management
-	e := app.Group("/api/v1")
+	e := app.Group("/api/v1", middleware.JWTMiddleware)
 	e.Post("/employees", controllers.CreateEmployee)
 	e.Get("/employees/:id", controllers.GetEmployeeByID)
 	e.Get("/employees", controllers.GetAllEmployees)
@@ -18,14 +19,15 @@ func SetEmployeeRoutes(app *fiber.App) {
 	e.Post("/expenses", controllers.CreateExpensesHandler)
 	e.Get("/expenses", controllers.GetExpensesHandler)
 	e.Get("/daily/expenses", controllers.GetExpensesByDateHandler)
+	e.Get("/station/expenses/:id", controllers.GetPaginatedExpensesByStation)
 	e.Get("/expenses/duration/:start_date/:end_date", controllers.GetExpensesByDurationHandler)
 	e.Patch("/expenses/:id", controllers.UpdateExpensesHandler)
 	e.Delete("/expenses/:id", controllers.DeleteExpensesHandler)
 
 	//pump readings
 	e.Post("/pump-readings", controllers.AddNewPumpReadings)
-	e.Get("/pump-readings", controllers.GetPumpReadingsHandler)
-	e.Get("/pump-readings/:id", controllers.GetPumpsByStationHandler)
+	e.Get("/pump-readings", controllers.GetOrderedPumpReadingsHandler)
+	e.Get("/pump-readings/:id", controllers.GetPumpReadingsHandler)
 	e.Patch("/pump-readings/:id", controllers.UpdatePumpReadingsHandler)
 	e.Delete("/pump-readings/:id", controllers.DeletePumpReadingsHandler)
 

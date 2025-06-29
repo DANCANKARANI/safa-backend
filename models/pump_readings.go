@@ -63,12 +63,22 @@ func UpdatePumpReadings(c *fiber.Ctx,id uuid.UUID, updatedReadings PumpReadings)
 
 //get latest pump readings BY STATION ID
 func GetLatestPumpReadingsByStationID(c *fiber.Ctx, stationID uuid.UUID) ([]PumpReadings, error) {
-	var pumpReadings []PumpReadings
-	if err := db.Where("station_id = ?", stationID).Order("created_at desc").Limit(1).Find(&pumpReadings).Error; err != nil {
+	var readings []PumpReadings
+
+	err := db.
+		Joins("JOIN pumps ON pumps.id = pump_readings.pump_id").
+		Where("pumps.station_id = ?", stationID).
+		Order("pump_readings.created_at DESC").
+		Limit(10).
+		Find(&readings).Error
+
+	if err != nil {
 		return nil, errors.New("failed to get latest pump readings")
 	}
-	return pumpReadings, nil
+
+	return readings, nil
 }
+
 // get paginated readings, ordered by time
 func GetPaginatedPumpReadings(c *fiber.Ctx, page, pageSize int) ([]PumpReadings, int64, error) {
 	var pumpReadings []PumpReadings
@@ -157,4 +167,12 @@ func GetTotalSalesByDate(c *fiber.Ctx) (*ResSales, error) {
 	return &res, nil
 }
 
-//get total sales per station
+//get paginate pump readings per station
+func GetPumpReadingsByStation(c *fiber.Ctx, stationID uuid.UUID) ([]PumpReadings, error) {
+	var pumpReadings []PumpReadings
+	if err := db.Where("station_id = ?", stationID).Find(&pumpReadings).Error; err != nil {
+		return nil, errors.New("failed to get pump readings by station")
+	}
+	return pumpReadings, nil
+}
+

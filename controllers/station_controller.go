@@ -48,7 +48,7 @@ func GetAllSalesInStationHandler(c *fiber.Ctx)error{
 
 func GetStationExpensesHandler(c *fiber.Ctx)error{
 	
-	expenses, err := models.GetSummationOfExpenses(c)
+	expenses, err := models.GetMonthlySummationOfExpenses(c)
 	if err != nil{
 		return utils.NewErrorResponse(c,"failed to get expenses",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}

@@ -80,7 +80,7 @@ func GetSupplierBalanceHandler(c *fiber.Ctx)error{
 
 //get all balances handler
 func GetAllSupplierBalancesHandler(c *fiber.Ctx)error{
-	data, err := repositories.GetSupplierDebts()
+	data, err := repositories.GetSupplierDebts( db)
 	if err != nil {
 		return utils.NewErrorResponse(c, "Failed to get supplier balances", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}

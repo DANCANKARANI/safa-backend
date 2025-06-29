@@ -12,15 +12,11 @@ import (
 )
 
 func (d *Dippings) BeforeSave(tx *gorm.DB) (err error) {
-	d.LitersDispensed = d.OpeningDip -d.ClosingDip 
+	d.LitersDispensed = d.OpeningDip+(d.AmountSupplied) - d.ClosingDip
 	return nil
 }
 
-func (d *Dippings) AfterFind(tx *gorm.DB) (err error) {
-	d.LitersDispensed = d.ClosingDip - d.OpeningDip
-	return nil
-}
-
+// Dippings represents the dipping records for fuel tanks
 func (d *Dippings) BeforeCreate(tx *gorm.DB) (err error) {
 	d.ID = uuid.New()
 	return nil
@@ -101,10 +97,18 @@ func DeleteDipping(c *fiber.Ctx, id uuid.UUID) error {
 }
  
 // get all paginated dippings
-func GetAllDippings(c *fiber.Ctx) ([]Dippings, error) {
+type DippingResponse struct {
+	Dippings
+	UnitCost         float64 `json:"unit_cost"`
+	AmountLostGained float64 `json:"amount_lost_gained"`
+}
+
+
+// func GetUnitCostAtDate(stationID, fuelProductID uuid.UUID, date time.Time) (float64, error)
+
+func GetAllDippings(c *fiber.Ctx) ([]DippingResponse, error) {
 	var dippings []Dippings
 
-	// Get page and pageSize from query params, set defaults if not provided
 	page := c.QueryInt("page", 1)
 	pageSize := c.QueryInt("pageSize", 10)
 	if page < 1 {
@@ -116,10 +120,78 @@ func GetAllDippings(c *fiber.Ctx) ([]Dippings, error) {
 
 	offset := (page - 1) * pageSize
 
-	if err := db.Limit(pageSize).Offset(offset).Find(&dippings).Error; err != nil {
+	// Handle month/year filtering
+	month := c.QueryInt("month", 0)
+	year := c.QueryInt("year", 0)
+	now := time.Now()
+	if month < 1 || month > 12 {
+		month = int(now.Month())
+	}
+	if year < 1 {
+		year = now.Year()
+	}
+	startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, now.Location())
+	endDate := startDate.AddDate(0, 1, 0)
+
+	// Preload Tank + Tank's FuelProduct + Tank's Station, filter by dipping_date
+	if err := db.
+		Preload("Tank").
+		Preload("Tank.FuelProduct").
+		Preload("Tank.Station").
+		Where("dipping_date >= ? AND dipping_date < ?", startDate, endDate).
+		Limit(pageSize).
+		Offset(offset).
+		Order("created_at DESC").
+		Find(&dippings).Error; err != nil {
 		return nil, err
 	}
-	return dippings, nil
+
+	var responses []DippingResponse
+
+	for _, dip := range dippings {
+		unitCost, err := GetUnitCostAtDate(dip.Tank.StationID, dip.Tank.FuelProductID, dip.DippingDate)
+		if err != nil {
+			unitCost = 0
+		}
+
+		amountLostGained := dip.Deviation * unitCost
+
+		resp := DippingResponse{
+			Dippings:        dip,
+			UnitCost:        unitCost,
+			AmountLostGained: amountLostGained,
+		}
+
+		responses = append(responses, resp)
+	}
+
+	return responses, nil
+}
+
+//function to get deviation and AmountLostGained for every Fuel product In a munth
+type MonthlyDippingSummary struct {
+	FuelProductID uuid.UUID `json:"fuel_product_id"`
+	FuelProduct   string    `json:"fuel_product"` // Name of the fuel product
+	Deviation     float64   `json:"deviation"`
+	AmountLostGained float64 `json:"amount_lost_gained"`
+}
+
+func GetMonthlyDippingSummary(c *fiber.Ctx) ([]MonthlyDippingSummary, error) {
+	month := c.Query("month")
+	year := c.Query("year")
+
+	var summaries []MonthlyDippingSummary
+
+	if err := db.
+		Model(&Dippings{}).
+		Select("fuel_product_id, SUM(deviation) as deviation, SUM(amount_lost_gained) as amount_lost_gained").
+		Where("EXTRACT(MONTH FROM dipping_date) = ? AND EXTRACT(YEAR FROM dipping_date) = ?", month, year).
+		Group("fuel_product_id").
+		Find(&summaries).Error; err != nil {
+		return nil, err
+	}
+
+	return summaries, nil
 }
 
 type TankComparison struct {
@@ -203,3 +275,15 @@ func ComparePumpReadingsWithDippings(c *fiber.Ctx) (*ResTankComparison, error) {
 
 	return &ResTankComparison{Comparisons: comparisons}, nil
 }
+
+func GetUnitCostAtDate(stationID, fuelProductID uuid.UUID, date time.Time) (float64, error) {
+	var sfp StationFuelProduct
+	err := db.Where("station_id = ? AND fuel_product_id = ? AND effective_from <= ?", stationID, fuelProductID, date).
+		Order("effective_from DESC").
+		First(&sfp).Error
+	if err != nil {
+		return 0, err
+	}
+	return sfp.UnitPrice, nil
+}
+

@@ -24,12 +24,9 @@ func AddPumpReadings(c *fiber.Ctx, pumpReadings models.PumpReadings) (*models.Pu
 		return nil, fmt.Errorf("no tanks linked to pump %s", pumpReadings.PumpID)
 	}
 
-	// For simplicity, take the first tank's fuel product price
-	fuelProduct := pump.Tanks[0].FuelProduct
+	// Step 1: Calculate UnitPrice
 
-	if fuelProduct.UnitPrice == 0 {
-		return nil, fmt.Errorf("fuel product price not set for fuel product %s", fuelProduct.ID)
-	}
+	
 
 	// Step 2: Set UnitPrice on pumpReadings
 

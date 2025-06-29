@@ -7,9 +7,8 @@ import(
 
 func SetSalaryAdvanceRoutes(app *fiber.App) {
 	// Define the routes for salary advance management
-	group := app.Group("/api/v1/salary/advances")
+	e := app.Group("/api/v1/salary/advances",middleware.JWTMiddleware)
 	//protected routes
-	e := group.Group("/",middleware.JWTMiddleware)
 	e.Post("/", controllers.CreateSalaryAdvanceHandler)
 	e.Get("/:id", controllers.GetSalaryAdvanceByIDHandler)
 	e.Patch("/:id", controllers.UpdateSalaryAdvanceHandler)

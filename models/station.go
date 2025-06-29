@@ -34,11 +34,13 @@ func GetAllStations(c *fiber.Ctx) (*[]Station, error) {
 		Preload("Tanks.Pumps.Nozzles").
 		Preload("Tanks.Dippings").
 		Preload("Tanks.Pumps.Sales").
+		Preload("StationFuelProducts.FuelProduct"). // 👈 Preload fuel prices and names
 		Find(&stations).Error; err != nil {
 		return nil, errors.New("failed to get all stations")
 	}
 	return &stations, nil
 }
+
 
 // GetSummationOfSalesAndLiters returns the total sales amount and dispersed liters from all pump readings in every station
 type ResStationSales struct {
@@ -123,27 +125,23 @@ type ResSationExpenses struct{
 	StationExpenses []StationExpenses `json:"station_expenses"`
 	TotalExpenses float64 `json:"total_expenses"`
 }
-
-func GetSummationOfExpenses(c *fiber.Ctx) (*ResSationExpenses, error) {
-	dateParam := c.Query("date")
-	var targetDate time.Time
+func GetMonthlySummationOfExpenses(c *fiber.Ctx) (*ResSationExpenses, error) {
+	monthParam := c.Query("month")
+	var startOfMonth time.Time
 	var err error
 
-	if dateParam == "" {
-		now := time.Now().UTC() // or .Local() if DB stores local time
-		// Set targetDate to today at 8:00 AM
-		targetDate = time.Date(now.Year(), now.Month(), now.Day(), 8, 0, 0, 0, now.Location())
+	if monthParam == "" {
+		now := time.Now().UTC() // or .Local() if DB uses local time
+		startOfMonth = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	} else {
-		targetDate, err = time.Parse("2006-01-02", dateParam)
+		startOfMonth, err = time.Parse("2006-01", monthParam)
 		if err != nil {
-			return nil, fmt.Errorf("invalid date format. Use YYYY-MM-DD")
+			return nil, fmt.Errorf("invalid month format. Use YYYY-MM")
 		}
-		// Adjust targetDate to 8:00 AM of that date
-		targetDate = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 8, 0, 0, 0, targetDate.Location())
 	}
 
-	startOfDay := targetDate
-	endOfDay := startOfDay.Add(24 * time.Hour) // 8 AM next day
+	// First day of next month
+	endOfMonth := startOfMonth.AddDate(0, 1, 0)
 
 	var stations []Station
 	if err := db.Preload("Expenses").Find(&stations).Error; err != nil {
@@ -156,8 +154,7 @@ func GetSummationOfExpenses(c *fiber.Ctx) (*ResSationExpenses, error) {
 	for _, station := range stations {
 		var total float64
 		for _, expense := range station.Expenses {
-			// Include expenses with ExpenseDate >= startOfDay AND < endOfDay
-			if !expense.ExpenseDate.Before(startOfDay) && expense.ExpenseDate.Before(endOfDay) {
+			if !expense.ExpenseDate.Before(startOfMonth) && expense.ExpenseDate.Before(endOfMonth) {
 				total += expense.Amount
 			}
 		}
@@ -175,4 +172,5 @@ func GetSummationOfExpenses(c *fiber.Ctx) (*ResSationExpenses, error) {
 		TotalExpenses:   totalExpenses,
 	}, nil
 }
+
 

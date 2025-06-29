@@ -45,17 +45,18 @@ type SalaryAdvance struct {
 }
 
 type Station struct{
-	ID          uuid.UUID `json:"id" gorm:"type:varchar(36);"`
-	Name        string    `json:"name" gorm:"size:100"`
-	Address     string    `json:"address" gorm:"size:255"`
-	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	ID         uuid.UUID `json:"id" gorm:"type:varchar(36);"`
+	Name      string      `json:"name"`
+	Address   string      `json:"address"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+	DeletedAt *gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 
+	// Relationships
+	StationFuelProducts []StationFuelProduct `json:"station_fuel_prices" gorm:"foreignKey:StationID"`
 	Employee	[]Employee	`json:"employees" gorm:"foreignKey:StationID;references:ID;constraint:OnUpdate:CASCADE"`
 	Expenses    []Expenses 	   `json:"expenses" gorm:"foreignKey:StationID;references:ID;constraint:OnUpdate:CASCADE"`
 	Tanks		[]Tank			`json:"tanks" gorm:"foreignKey:StationID;references:ID;constraint:OnUpdate:CASCADE"`
-
 }
 
 // Tank represents a tank at the station
@@ -66,6 +67,7 @@ type Tank struct {
 	FuelProductID uuid.UUID `json:"fuel_product_id" gorm:"type:varchar(36);not null"`
 	FuelProduct   FuelProduct   `json:"fuel_product" gorm:"foreignKey:FuelProductID"` // ✅ Added this line
 	StationID    uuid.UUID `json:"station_id" gorm:"type:varchar(36);not null"`
+	Station       Station   `json:"station" gorm:"foreignKey:StationID"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
@@ -98,16 +100,31 @@ type Nozzle struct {
 
 // FuelProduct represents a fuel product available at the station
 type FuelProduct struct {
-	ID          uuid.UUID `json:"id" gorm:"type:varchar(36);"`
-	Name        string    `json:"name" gorm:"size:100"`
-	Description string    `json:"description" gorm:"size:255"`
-	UnitPrice float64   `json:"unit_price" gorm:"type:decimal(10,2);not null"`
-	EffectiveFrom	time.Time `json:"effective_at" gorm:"not null"`
-	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
-	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	ID         uuid.UUID `json:"id" gorm:"type:varchar(36);"`
+	Name      string      `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+	DeletedAt *gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+
+	// Relationships
+	StationFuelProducts []StationFuelProduct `json:"station_fuel_prices" gorm:"foreignKey:FuelProductID"`
 
 	Tanks		[]Tank			`json:"tanks" gorm:"foreignKey:FuelProductID;references:ID;constraint:OnUpdate:CASCADE"`
+}
+
+type StationFuelProduct struct {
+	ID         uuid.UUID `json:"id" gorm:"type:varchar(36);"`
+	StationID     uuid.UUID   `json:"station_id"`
+	FuelProductID uuid.UUID   `json:"fuel_product_id"`
+	UnitPrice     float64     `json:"unit_price" gorm:"type:decimal(10,2);not null"`
+	EffectiveFrom time.Time   `json:"effective_from" gorm:"not null"`
+	CreatedAt     time.Time   `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time   `json:"updated_at" gorm:"autoUpdateTime"`
+
+	// Associations
+	Station     Station     `json:"station" gorm:"foreignKey:StationID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	FuelProduct FuelProduct `json:"fuel_product" gorm:"foreignKey:FuelProductID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 
@@ -156,6 +173,8 @@ type Supply struct {
 	EmployeeID    uuid.UUID `json:"employee_id" gorm:"type:char(36);not null"`         // Recorded by which employee
 	ReferenceNo   string    `json:"reference_no" gorm:"size:50"`                       // Invoice or PO number
 	FuelProductID uuid.UUID `json:"fuel_product_id" gorm:"type:char(36);not null"`     // FK to FuelProduct
+	FuelProduct   FuelProduct   `json:"fuel_product" gorm:"foreignKey:FuelProductID;references:ID"`
+
 	Quantity      float64   `json:"quantity" gorm:"type:decimal(10,2);not null"`       // Litres or gallons
 	UnitPrice     float64   `json:"unit_price" gorm:"type:decimal(10,2);not null"`     // Cost per unit
 	TotalAmount   float64   `json:"total_amount" gorm:"type:decimal(10,2);not null"`   // Quantity × UnitPrice
@@ -171,7 +190,9 @@ type Supply struct {
 type SupplierDebt struct {
 	ID              uuid.UUID `json:"id" gorm:"type:char(36);primaryKey"`
 	SupplierID      uuid.UUID `json:"supplier_id" gorm:"type:char(36);not null"`
-	SupplyID        uuid.UUID `json:"supply_id" gorm:"type:char(36)"` // Optional if transaction type is "payment"
+	SupplyID        *uuid.UUID `json:"supply_id" gorm:"type:char(36)"` // Optional if transaction type is "payment"
+	Supply          *Supply        `json:"supply,omitempty" gorm:"foreignKey:SupplyID;references:ID"`
+
 	TransactionType string    `json:"transaction_type" gorm:"size:20;not null"` // "supply", "payment", etc.
 	Amount          float64   `json:"amount" gorm:"type:decimal(10,2);not null"` 
 	RunningBalance  float64   `json:"running_balance" gorm:"type:decimal(10,2);not null"` // After this transaction
@@ -215,9 +236,12 @@ type Dippings struct {
 	OpeningDip      float64    `json:"opening_dip" gorm:"type:decimal(10,2);not null"`
 	ClosingDip      float64    `json:"closing_dip" gorm:"type:decimal(10,2);not null"`
 	LitersDispensed float64    `json:"liters_dispensed" gorm:"type:decimal(10,2);not null"`
+	AmountSupplied float64    `json:"amount_supplied" gorm:"type:decimal(10,2);not null"`
+	Deviation	  float64    `json:"deviation" gorm:"type:decimal(10,2);not null"` // Difference dip and sales
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	Tank		Tank			`json:"tanks" gorm:"foreignKey:TankID;references:ID;constraint:OnUpdate:CASCADE"`
 }
 
 // Expenses represents expenses incurred by the station

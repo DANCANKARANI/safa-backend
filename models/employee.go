@@ -184,6 +184,9 @@ func UpdateEmployee(c *fiber.Ctx, id uuid.UUID, updatedData *Employee) (*Employe
 	if updatedData.Position != "" {
 		employee.Position = updatedData.Position
 	}
+	if updatedData.Role != "" {
+		employee.Role = updatedData.Role
+	}
 
 	if updatedData.PhoneNumber != "" {
 		if !services.ValidatePhoneNumber(updatedData.PhoneNumber) {

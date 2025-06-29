@@ -2,12 +2,13 @@ package routes
 
 import (
 	"github.com/dancankarani/safa/controllers"
+	"github.com/dancankarani/safa/middleware"
 	"github.com/dancankarani/safa/models"
 	"github.com/gofiber/fiber/v2"
 )
 
 func SetAdminRoutes(app *fiber.App) {
-	g := app.Group("/api/v1")
+	g := app.Group("/api/v1", middleware.JWTMiddleware)
 	//stations
 	stations := g.Group("/admin/stations")
 	stations.Get("/", controllers.ReadAllStationsController)
@@ -43,6 +44,11 @@ func SetAdminRoutes(app *fiber.App) {
 	supplies.Post("/", controllers.AddSupplyHandler)
 	supplies.Patch("/:id", controllers.UpdateSupplyHandler)
 	supplies.Delete("/:id", controllers.DeleteSupplyHandler)
+	
+	//debts
+	debts := g.Group("/admin/supplier/debts")
+	debts.Get("/", controllers.GetSupplierDebtsHandler)
+	
 
 	// dippings
 	dippings := g.Group("/admin/dippings")
@@ -104,6 +110,7 @@ func SetAdminRoutes(app *fiber.App) {
 	payments.Post("/", controllers.AddNewEmployeePayment)
 	payments.Get("/report", controllers.GetPayrollReportHandler)
 
+
 	//fuel stock
 	stock := g.Group("/admin/stock")
 	stock.Get("/", controllers.GetFuelStockHandler)
@@ -111,5 +118,6 @@ func SetAdminRoutes(app *fiber.App) {
 	//supplier payments
 	payment := g.Group("/admin/supplier-payments")
 	payment.Post("/", controllers.AddSupplierPayments)
+	
 }
 

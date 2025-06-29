@@ -119,12 +119,33 @@ func DeleteExpenses(c *fiber.Ctx, id uuid.UUID) error {
 }
 
 //GET EXPENSES OF A PROVIDED DURATION 
-func GetExpensesByDuration(c *fiber.Ctx, startDate time.Time, endDate time.Time) ([]Expenses, error) {
+func GetExpensesByDuration(c *fiber.Ctx, startDate, endDate time.Time) ([]Expenses, error) {
 	var expenses []Expenses
+
+	// If both dates are zero (not provided), use current month's range
+	if startDate.IsZero() && endDate.IsZero() {
+		now := time.Now()
+		startDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		endDate = now
+	}
+
 	if err := db.Where("expense_date BETWEEN ? AND ?", startDate, endDate).Find(&expenses).Error; err != nil {
 		return nil, errors.New("expenses not found")
 	}
+
 	return expenses, nil
 }
 
 //get expenses by duration
+
+func GetPaginatedExpensesByStation(c *fiber.Ctx, stationID uuid.UUID, page, pageSize int) ([]Expenses, error) {
+	var expenses []Expenses
+	if err := db.Where("station_id = ?", stationID).
+		Order("expense_date DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&expenses).Error; err != nil {
+		return nil, errors.New("failed to get expenses")
+	}
+	return expenses, nil
+}

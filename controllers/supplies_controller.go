@@ -59,3 +59,11 @@ func GetSupplyByIDHandler(c *fiber.Ctx)error{
 	}
 	return utils.SuccessResponse(c,"Supply retrieved successfully", data)
 }
+
+func GetSupplierDebtsHandler(c *fiber.Ctx)error{
+	data, err := repositories.GetSupplierDebts(db)
+	if err != nil{
+		return utils.NewErrorResponse(c,"failed to get supplier debts",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+	}
+	return utils.SuccessResponse(c,"Supply debts retrieved successfully", data)
+}

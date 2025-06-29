@@ -83,3 +83,15 @@ func GetExpensesByDurationHandler(c *fiber.Ctx) error {
 	}
 	return utils.SuccessResponse(c, "Expenses retrieved successfully", expenses)
 }
+
+func GetPaginatedExpensesByStation(c *fiber.Ctx)error{
+	
+	id, _ := uuid.Parse(c.Params("id"))
+	page := c.QueryInt("page", 1)
+	pageSize := c.QueryInt("pageSize", 10)
+	expenses, err := models.GetPaginatedExpensesByStation(c, id, page, pageSize)
+	if err != nil {
+		return utils.NewErrorResponse(c, "Failed to get expenses", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+	}
+	return utils.SuccessResponse(c, "Expenses retrieved successfully", expenses)
+}
