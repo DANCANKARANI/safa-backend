@@ -2,11 +2,9 @@ package services
 
 
 import (
-	"context"
 	"errors"
 	"os"
 	"time"
-	"github.com/dancankarani/safa/database"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -70,13 +68,8 @@ func ValidateToken(tokenString string)(*Claims,error){
 	if ! ok{
 		return nil, errors.New("invalid user token")
 	}
-	isRevoked, err := database.RedisClient().SIsMember(context.Background(),"revoked_tokens",tokenString).Result()
-	if err != nil{
-		return nil, err
-	}
-	if isRevoked{
-		return nil, errors.New("user token is revoked")
-	}
+
+
 	return claims,nil
 }
 
@@ -84,13 +77,6 @@ func ValidateToken(tokenString string)(*Claims,error){
 Invalidates token when logged out
 @params tokenString
 */
-func InvalidateToken(tokenString string)error{
-	err := database.RedisClient().SAdd(context.Background(), "revoked_token", tokenString).Err()
-	if err != nil{
-		return err
-	}
-	return nil
-}
 
 /*
 gets the users id from the token
