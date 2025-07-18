@@ -1,8 +1,8 @@
 package repositories
 
 import (
-
 	"fmt"
+	"time"
 
 	"github.com/dancankarani/safa/models"
 	"github.com/gofiber/fiber/v2"
@@ -24,11 +24,6 @@ func AddPumpReadings(c *fiber.Ctx, pumpReadings models.PumpReadings) (*models.Pu
 		return nil, fmt.Errorf("no tanks linked to pump %s", pumpReadings.PumpID)
 	}
 
-	// Step 1: Calculate UnitPrice
-
-	
-
-	// Step 2: Set UnitPrice on pumpReadings
 
 	returnVal := &pumpReadings
 
@@ -51,6 +46,15 @@ func AddPumpReadings(c *fiber.Ctx, pumpReadings models.PumpReadings) (*models.Pu
 		if tank.ID == uuid.Nil || tank.StationID == uuid.Nil || tank.FuelProductID == uuid.Nil {
 			return fmt.Errorf("incomplete tank configuration")
 		}
+		if pumpReadings.BusinessDay.IsZero() {
+			return fmt.Errorf("business_day is required and must be a valid date")
+		}
+
+		// Optional: disallow future business dates
+		if pumpReadings.BusinessDay.After(time.Now()) {
+			return fmt.Errorf("business_day cannot be in the future")
+		}
+
 		// 1. Save pump readings
 		fmt.Println(pumpReadings.LitersDispensed)
 		

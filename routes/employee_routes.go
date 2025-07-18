@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/dancankarani/safa/controllers"
 	"github.com/dancankarani/safa/middleware"
+	"github.com/dancankarani/safa/models"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -27,6 +28,7 @@ func SetEmployeeRoutes(app *fiber.App) {
 	//pump readings
 	e.Post("/pump-readings", controllers.AddNewPumpReadings)
 	e.Get("/pump-readings", controllers.GetOrderedPumpReadingsHandler)
+	e.Get("/pump-readings/:pump_id", controllers.GetOpeningReadingsHandler)
 	e.Get("/pump-readings/:id", controllers.GetPumpReadingsHandler)
 	e.Patch("/pump-readings/:id", controllers.UpdatePumpReadingsHandler)
 	e.Delete("/pump-readings/:id", controllers.DeletePumpReadingsHandler)
@@ -36,5 +38,12 @@ func SetEmployeeRoutes(app *fiber.App) {
 	//send email
 	em := app.Group("/api/v1")
 	em.Post("/send-email", controllers.SendEmail)
-	
+
+	//daily accounts
+	e.Post("/daily-accounts", models.AddDailyAccounts)
+	e.Get("/daily-accounts", models.GetDailyAccounts)
+	e.Get("/daily-accounts/:id", models.GetDailyAccount)
+	e.Patch("/daily-accounts/:id", models.UpdateDailyAccount)
+	e.Get("/monthly-accounts", models.GetMonthlyDailyAccounts)
+
 }

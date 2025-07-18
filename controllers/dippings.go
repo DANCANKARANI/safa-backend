@@ -82,11 +82,8 @@ func GetDippingByFuelProductHandler(c *fiber.Ctx)error {
 //update dipping
 func UpdateDippingHandler(c *fiber.Ctx)error {
 	id, _ := uuid.Parse(c.Params("id"))
-	dipping := models.Dippings{}
-	if err := c.BodyParser(&dipping); err != nil {
-		return utils.NewErrorResponse(c,"failed to update",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
-	}
-	updatedDipping, err := models.UpdateDippings(id, &dipping)
+	
+	updatedDipping, err := models.UpdateDippings(c, id)
 	if err != nil {
 		return utils.NewErrorResponse(c,"failed to update",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}
@@ -100,4 +97,24 @@ func CompareDippingsAndSales(c *fiber.Ctx)error {
 		return utils.NewErrorResponse(c,"failed to get dippings",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}
 	return utils.SuccessResponse(c,"Dippings retrieved successfully",data)
+}
+
+//get openingDippings handler
+func GetOpeningDipHandler(c *fiber.Ctx)error{
+	id, _ := uuid.Parse(c.Params("tank_id"))
+	openingDipping, err := models.GetOpeningDippings(c, id)
+	if err != nil {
+		return utils.NewErrorResponse(c,"failed to get opening dippings",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+	}
+	return utils.SuccessResponse(c,"Opening dippings retrieved successfully",openingDipping)
+}
+
+//get corresponding closing sales for the dippings
+func GetClosingSalesHandler(c *fiber.Ctx)error{
+	id, _ := uuid.Parse(c.Params("tank_id"))
+	closingDipping, err := models.GetLatestReadingsSumByTankID(id)
+	if err != nil {
+		return utils.NewErrorResponse(c,"failed to get closing sales",map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+	}
+	return utils.SuccessResponse(c,"Closing corresponding sales retrieved successfully",closingDipping)
 }

@@ -181,17 +181,17 @@ func GetSupplierBalance(db *gorm.DB, supplierID uuid.UUID) (debtYouOwe float64, 
 
 
 type SupplierDebtDTO struct {
-	TransactionType    string
-	FuelType           string
-	Quantity           float64
-	UnitCost           float64
-	CarNumber          string
-	Amount             float64
-	RunningBalance     float64
-	SellingPrice       float64
-	Profit             float64
-	Notes              string
-	Date               time.Time
+	TransactionType    string 	`json:"transaction_type"`
+	FuelType           string	`json:"fuel_type"`
+	Quantity           float64	`json:"quantity"`
+	UnitCost           float64	`json:"unit_cost"`
+	CarNumber          string	`json:"car_number"`
+	Amount             float64	`json:"amount"`
+	RunningBalance     float64	`json:"running_balance"`
+	SellingPrice       float64	`json:"selling_price"`
+	Profit             float64	`json:"profit"`
+	Notes              string	`json:"notes"`
+	Date               time.Time `json:"date"`
 }
 
 func GetSupplierDebts(db *gorm.DB) ([]SupplierDebtDTO, error) {

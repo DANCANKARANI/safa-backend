@@ -52,6 +52,8 @@ func SetAdminRoutes(app *fiber.App) {
 
 	// dippings
 	dippings := g.Group("/admin/dippings")
+	dippings.Get("/opening/:tank_id", controllers.GetOpeningDipHandler)
+	dippings.Get("/closing/:tank_id", controllers.GetClosingSalesHandler)
 	dippings.Get("/", controllers.GetAllDippingsHandler)
 	dippings.Get("/:id", controllers.GetDippingByIDHandler)
 	dippings.Get("/station/:id", controllers.GetDippingsByStationHandler)
@@ -86,7 +88,7 @@ func SetAdminRoutes(app *fiber.App) {
 	pumps := g.Group("/admin/pumps")
 	pumps.Get("/station/:id", controllers.GetPumpsByStationHandler)
 	pumps.Get("/:id", controllers.GetPumpByIDHandler)
-	pumps.Post("/", controllers.AddNewPumpHandler)
+	pumps.Post("/:tank_id", controllers.AddNewPumpHandler)
 	pumps.Patch("/:id", controllers.UpdatePumpHandler)
 	pumps.Delete("/:id", controllers.DeletePumpHandler)
 	pumps.Post("/:tank_id/:pump_id", controllers.AssignPumpToTankHandler)
@@ -117,7 +119,6 @@ func SetAdminRoutes(app *fiber.App) {
 
 	//supplier payments
 	payment := g.Group("/admin/supplier-payments")
-	payment.Post("/", controllers.AddSupplierPayments)
-	
+	payment.Post("/", controllers.AddSupplierPayments)	
 }
 

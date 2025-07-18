@@ -15,7 +15,9 @@ func AddNewPumpHandler(c *fiber.Ctx) error {
 		log.Println(err.Error())
 		return utils.NewErrorResponse(c, "Bad request", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}
-	newPump, err := models.CreatePump(c, pump)
+	tank_id:= uuid.MustParse(c.Params("tank_id"))
+
+	newPump, err := models.CreatePump(c, pump, tank_id)
 	if err != nil {
 		return utils.NewErrorResponse(c, "Failed to add pump", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
 	}

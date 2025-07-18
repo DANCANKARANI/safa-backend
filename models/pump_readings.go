@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -11,16 +12,10 @@ import (
 )
 
 func (p *PumpReadings) BeforeSave(tx *gorm.DB) (err error) { 
-	p.LitersDispensed = p.OpeningMeter - p.ClosingMeter
+	p.LitersDispensed = p.ClosingMeter - p.OpeningMeter
 	p.TotalSalesAmount =   p.LitersDispensed * p.UnitPrice
-	p.BankDeposit = p.TotalSalesAmount- p.MpesaAmount
 	return nil
 }
-
-
-
-
-
 
 
 
@@ -32,6 +27,15 @@ func UpdatePumpReadings(c *fiber.Ctx,id uuid.UUID, updatedReadings PumpReadings)
 		return nil, errors.New("pump readings not found")
 	}
 	
+	if !updatedReadings.BusinessDay.IsZero() {
+		pumpReadings.BusinessDay = updatedReadings.BusinessDay
+		// Optional: disallow future business dates
+		if pumpReadings.BusinessDay.After(time.Now()) {
+			return nil, fmt.Errorf("business_day cannot be in the future")
+		}
+
+		pumpReadings.BusinessDay = updatedReadings.BusinessDay
+	}
 
 	if updatedReadings.OpeningSalesAmount != 0 {
 		pumpReadings.OpeningSalesAmount = updatedReadings.OpeningSalesAmount
@@ -80,21 +84,96 @@ func GetLatestPumpReadingsByStationID(c *fiber.Ctx, stationID uuid.UUID) ([]Pump
 }
 
 // get paginated readings, ordered by time
-func GetPaginatedPumpReadings(c *fiber.Ctx, page, pageSize int) ([]PumpReadings, int64, error) {
+type PumpReadingResponse struct {
+	ID                 uuid.UUID `json:"id"`
+	PumpID            uuid.UUID `json:"pump_id"`
+	ReadingDate        time.Time `json:"reading_date"`
+	StationName        string    `json:"station"`
+	FuelType           string    `json:"fuel_type"`
+	Shift              string    `json:"shift"`
+	OpeningMeter       float64   `json:"opening_meter"`
+	ClosingMeter       float64   `json:"closing_meter"`
+	OpeningSalesAmount float64   `json:"opening_sales"`
+	ClosingSalesAmount float64   `json:"closing_sales"`
+	LitersDispensed    float64   `json:"liters_dispensed"`
+	UnitPrice          float64   `json:"unit_price"`
+	TotalSalesAmount   float64   `json:"total_sales"`
+}
+
+func GetPaginatedPumpReadings(c *fiber.Ctx, page, pageSize int) ([]PumpReadingResponse, int64, error) {
 	var pumpReadings []PumpReadings
 	var total int64
 
-	// Count total records
-	if err := db.Model(&PumpReadings{}).Count(&total).Error; err != nil {
+	// Get "month" param (format: YYYY-MM)
+	monthStr := c.Query("month") // Example: "2025-05"
+
+	// Default: current year and month
+	var startOfMonth, endOfMonth time.Time
+	var err error
+
+	if monthStr != "" {
+		// Parse from query
+		startOfMonth, err = time.Parse("2006-01", monthStr)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid month format, use YYYY-MM")
+		}
+	} else {
+		now := time.Now()
+		startOfMonth = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	}
+
+	endOfMonth = startOfMonth.AddDate(0, 1, 0)
+
+	offset := (page - 1) * pageSize
+
+	// Count total filtered records
+	if err := db.Model(&PumpReadings{}).
+		Where("reading_date >= ? AND reading_date < ?", startOfMonth, endOfMonth).
+		Count(&total).Error; err != nil {
 		return nil, 0, errors.New("failed to count pump readings")
 	}
 
-	offset := (page - 1) * pageSize
-	if err := db.Order("created_at desc").Limit(pageSize).Offset(offset).Find(&pumpReadings).Error; err != nil {
+	// Fetch paginated, filtered, and preloaded records
+	if err := db.
+		Preload("Pump.Tanks.FuelProduct").
+		Preload("Pump.Tanks.Station").
+		Where("reading_date >= ? AND reading_date < ?", startOfMonth, endOfMonth).
+		Order("created_at DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&pumpReadings).Error; err != nil {
 		return nil, 0, errors.New("failed to get paginated pump readings")
 	}
-	return pumpReadings, total, nil
+
+	var results []PumpReadingResponse
+	for _, reading := range pumpReadings {
+		var stationName, fuelType string
+		if len(reading.Pump.Tanks) > 0 {
+			tank := reading.Pump.Tanks[0]
+			stationName = tank.Station.Name
+			fuelType = tank.FuelProduct.Name
+		}
+
+		results = append(results, PumpReadingResponse{
+			ID:                 reading.ID,
+			PumpID:            reading.PumpID,
+			ReadingDate:        reading.ReadingDate,
+			StationName:        stationName,
+			FuelType:           fuelType,
+			Shift:              reading.Shift,
+			OpeningMeter:       reading.OpeningMeter,
+			ClosingMeter:       reading.ClosingMeter,
+			OpeningSalesAmount: reading.OpeningSalesAmount,
+			ClosingSalesAmount: reading.ClosingSalesAmount,
+			LitersDispensed:    reading.LitersDispensed,
+			UnitPrice:          reading.UnitPrice,
+			TotalSalesAmount:   reading.TotalSalesAmount,
+		})
+	}
+
+	return results, total, nil
 }
+
 
 func DeletePumpReadings(c *fiber.Ctx, id uuid.UUID) error {
 	var pumpReadings PumpReadings
@@ -112,8 +191,6 @@ func DeletePumpReadings(c *fiber.Ctx, id uuid.UUID) error {
 type ResSales struct {
 	TotalSales  float64 `json:"total_sales"`
 	TotalLiters float64	`json:"total_liters"`
-	MpesaAmount float64	`json:"mpesa_amount"`
-	BankDeposit float64	`json:"bank_deposit"`
 }
 
 func GetTotalSalesByDate(c *fiber.Ctx) (*ResSales, error) {
@@ -155,9 +232,7 @@ func GetTotalSalesByDate(c *fiber.Ctx) (*ResSales, error) {
 		Where("reading_date BETWEEN ? AND ?", startDate, endDate).
 		Select(`
 			COALESCE(SUM(total_sales_amount), 0) as total_sales, 
-			COALESCE(SUM(liters_dispensed), 0) as total_liters, 
-			COALESCE(SUM(mpesa_amount), 0) as mpesa_amount,
-			COALESCE(SUM(bank_deposit), 0) as bank_deposit
+			COALESCE(SUM(liters_dispensed), 0) as total_liters
 		`).
 		Scan(&res).Error; err != nil {
 		log.Println(err.Error())
@@ -176,3 +251,25 @@ func GetPumpReadingsByStation(c *fiber.Ctx, stationID uuid.UUID) ([]PumpReadings
 	return pumpReadings, nil
 }
 
+//get latest Meter reading and sales readings
+//this will act as opening sales and meter readings for the next
+type resOpeningReadings struct {
+	OpeningMeter       float64 `json:"opening_meter"`
+	OpeningSalesAmount float64 `json:"opening_sales_amount"`
+}
+
+func GetOpeningReadings(c *fiber.Ctx, pumpID uuid.UUID) (*resOpeningReadings, error) {
+	var pumpReadings PumpReadings
+	if err := db.Where("pump_id = ?", pumpID).
+		Order("created_at DESC").	
+		First(&pumpReadings).Error; err != nil {
+		log.Println(err.Error())
+		return nil, errors.New("failed to get latest pump readings")
+	}	
+	return &resOpeningReadings{
+		OpeningMeter:       pumpReadings.ClosingMeter,
+		OpeningSalesAmount: pumpReadings.ClosingSalesAmount,
+	}, nil
+}
+
+//get daily sales per station

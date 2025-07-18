@@ -22,7 +22,6 @@ func AddNewPumpReadings(c *fiber.Ctx) error {
 
 
 
-
 func UpdatePumpReadingsHandler(c *fiber.Ctx) error {
 	id, _ := uuid.Parse(c.Params("id"))
 	pumpReadings := models.PumpReadings{}
@@ -55,8 +54,8 @@ func GetPumpReadingsHandler(c *fiber.Ctx) error {
 }
 
 type PumpReadingsResponse struct {
-	PumpReadings []models.PumpReadings `json:"pumpReadings"`
-	Total        int64                 `json:"total"`
+	PumpReadings []models.PumpReadingResponse `json:"pumpReadings"`
+	Total        int64                        `json:"total"`
 }
 
 func GetOrderedPumpReadingsHandler(c *fiber.Ctx) error {
@@ -80,4 +79,14 @@ func GetAllSalesByDateHandler(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, "Sales retrieved successfully", sales)
+}
+
+//get opening readings
+func GetOpeningReadingsHandler(c *fiber.Ctx) error {
+	pumpID, _ := uuid.Parse(c.Params("pump_id"))
+	openingReadings, err := models.GetOpeningReadings(c, pumpID)
+	if err != nil {
+		return utils.NewErrorResponse(c, "Failed to get opening readings", map[string][]string{"error": {err.Error()}}, fiber.StatusBadRequest)
+	}
+	return utils.SuccessResponse(c, "Opening readings retrieved successfully", openingReadings)
 }

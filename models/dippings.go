@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"log"
 	"math"
 	"sort"
 	"time"
@@ -60,29 +61,7 @@ func GetDippingByDippingDate(date time.Time) ([]Dippings, error) {
 	}
 	return dippings, nil
 }
-func UpdateDippings(id uuid.UUID, updated *Dippings) (*Dippings, error) {
-	var dippings Dippings
-	if err := db.First(&dippings, "id = ?", id).Error; err != nil {
-		return nil, err
-	}
 
-	// Update fields
-	if updated.OpeningDip != 0 {
-		dippings.OpeningDip = updated.OpeningDip
-	}
-	
-	if updated.ClosingDip != 0 {
-		dippings.ClosingDip = updated.ClosingDip
-	}
-	dippings.DippingDate = updated.DippingDate
-	
-	// Add other fields as needed
-
-	if err := db.Save(&dippings).Error; err != nil {
-		return nil, err
-	}
-	return &dippings, nil
-}
 
 //delete
 func DeleteDipping(c *fiber.Ctx, id uuid.UUID) error {
@@ -287,3 +266,93 @@ func GetUnitCostAtDate(stationID, fuelProductID uuid.UUID, date time.Time) (floa
 	return sfp.UnitPrice, nil
 }
 
+//get openingDipping readings
+type resOpeningDippings struct {
+	OpeningDip         float64   `json:"opening_dip"`
+	OpeningMeterReading float64  `json:"opening_meter_reading"`
+	Date               time.Time `json:"date"`
+}
+
+func GetOpeningDippings(c *fiber.Ctx, tankID uuid.UUID) (*resOpeningDippings, error) {
+	var dippings Dippings
+	if err := db.Where("tank_id = ?", tankID).Order("dipping_date DESC").First(&dippings).Error; err != nil {
+		return nil, err
+	}
+
+	openingDippings := &resOpeningDippings{
+		OpeningDip:         dippings.ClosingDip,
+		OpeningMeterReading: dippings.ClosingMeter,
+		Date:               dippings.DippingDate,
+	}
+
+	return openingDippings, nil
+}
+
+//get latest summation of pump readings that acts as the closing sales for the dipping
+
+
+func GetLatestReadingsSumByTankID(tankID uuid.UUID) (*ResSales, error) {
+	var res ResSales
+
+	query := `
+	SELECT 
+		SUM(pr.closing_sales_amount) AS total_sales,
+		SUM(pr.closing_meter) AS total_liters
+	FROM pump_readings pr
+	JOIN (
+		SELECT pump_id, MAX(reading_date) AS latest_reading
+		FROM pump_readings
+		GROUP BY pump_id
+	) latest ON pr.pump_id = latest.pump_id AND pr.reading_date = latest.latest_reading
+	JOIN tank_pumps tp ON tp.pump_id = pr.pump_id
+	WHERE tp.tank_id = ?
+	`
+
+	if err := db.Raw(query, tankID).Scan(&res).Error; err != nil {
+		log.Println("Error fetching latest readings sum:", err)
+		return nil, errors.New("failed to get latest pump readings for tank")
+	}
+
+	return &res, nil
+}
+
+func UpdateDippings(c *fiber.Ctx, dippingID uuid.UUID) (*Dippings, error) {
+	var updateData Dippings
+	if err := c.BodyParser(&updateData); err != nil {
+		return nil, errors.New("failed to parse request body")
+	}
+
+	var existing Dippings
+	if err := db.First(&existing, "id = ?", dippingID).Error; err != nil {
+		return nil, errors.New("dipping not found")
+	}
+
+	// Only update fields that are non-zero or non-default
+	if updateData.OpeningDip != 0 {
+		existing.OpeningDip = updateData.OpeningDip
+	}
+	if updateData.ClosingDip != 0 {
+		existing.ClosingDip = updateData.ClosingDip
+	}
+	if updateData.AmountSupplied != 0 {
+		existing.AmountSupplied = updateData.AmountSupplied
+	}
+	if !updateData.DippingDate.IsZero() {
+		existing.DippingDate = updateData.DippingDate
+	}
+	if updateData.ClosingMeter != 0 {
+		existing.ClosingMeter = updateData.ClosingMeter
+	}
+	// Add more fields as needed
+
+	// Recalculate LitersDispensed if relevant fields changed
+	existing.LitersDispensed = existing.OpeningDip + existing.AmountSupplied - existing.ClosingDip
+
+	if err := db.Save(&existing).Error; err != nil {
+		return nil, errors.New("failed to update dipping")
+	}
+
+	return &existing, nil
+}
+
+/*delete dipping*/

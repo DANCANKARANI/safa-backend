@@ -10,6 +10,10 @@ func MigrateDb(){
 		&Station{},
 		&Expenses{},
 		&Nozzle{},
+		&Customer{},
+		&CustomerCredit{},
+		&CustomerCreditPayment{},
+		&DailyAccounts{},
 
 
 		&PumpReadings{},

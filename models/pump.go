@@ -9,16 +9,47 @@ import (
 	"github.com/google/uuid"
 )
 
-func CreatePump(c *fiber.Ctx, pump *Pump)(*Pump, error) {
+func CreatePump(c *fiber.Ctx, pump *Pump, tankID uuid.UUID) (*Pump, error) {
+	// Begin transaction
+	tx := db.Begin()
+	if tx.Error != nil {
+		return nil, errors.New("failed to start transaction")
+	}
 
+	// Generate new UUID
 	pump.ID = uuid.New()
-	err := db.Create(&pump).Error
-	if err != nil {
-		log.Println(err.Error())
+
+	// Create the pump
+	if err := tx.Create(pump).Error; err != nil {
+		tx.Rollback()
+		log.Println("Error creating pump:", err)
 		return nil, errors.New("failed to create pump")
 	}
+
+	// Find the tank
+	var tank Tank
+	if err := tx.Preload("Pumps").First(&tank, "id = ?", tankID).Error; err != nil {
+		tx.Rollback()
+		log.Println("Tank not found:", err)
+		return nil, fmt.Errorf("tank not found: %w", err)
+	}
+
+	// Associate the pump with the tank
+	if err := tx.Model(&tank).Association("Pumps").Append(pump); err != nil {
+		tx.Rollback()
+		log.Println("Failed to assign pump to tank:", err)
+		return nil, fmt.Errorf("failed to assign pump to tank: %w", err)
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		log.Println("Transaction commit failed:", err)
+		return nil, errors.New("failed to commit transaction")
+	}
+
 	return pump, nil
 }
+
 
 //update Pump
 func UpdatePump(c *fiber.Ctx, id uuid.UUID) (*Pump, error) {

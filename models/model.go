@@ -235,6 +235,8 @@ type Dippings struct {
 	DippingDate     time.Time `json:"dipping_date" gorm:"autoCreateTime"`
 	OpeningDip      float64    `json:"opening_dip" gorm:"type:decimal(10,2);not null"`
 	ClosingDip      float64    `json:"closing_dip" gorm:"type:decimal(10,2);not null"`
+	OpeningMeter   float64    `json:"opening_meter" gorm:"type:decimal(10,2);not null"`
+	ClosingMeter   float64    `json:"closing_meter" gorm:"type:decimal(10,2);not null"`
 	LitersDispensed float64    `json:"liters_dispensed" gorm:"type:decimal(10,2);not null"`
 	AmountSupplied float64    `json:"amount_supplied" gorm:"type:decimal(10,2);not null"`
 	Deviation	  float64    `json:"deviation" gorm:"type:decimal(10,2);not null"` // Difference dip and sales
@@ -274,7 +276,8 @@ type PumpReadings struct {
 	ID          uuid.UUID `json:"id" gorm:"type:varchar(36);"`
 	PumpID      uuid.UUID `json:"pump_id" gorm:"type:varchar(36);not null"`
 	ReadingDate  time.Time `json:"reading_date" gorm:"autoCreateTime"`
-	Shift 	 string    `json:"shift" gorm:"size:50;not null"`
+	BusinessDay  time.Time `json:"business_day" gorm:"type:date;index"`
+	Shift       string    `json:"shift" gorm:"size:50;not null"`
 	OpeningMeter float64    `json:"opening_meter" gorm:"type:decimal(10,2);not null"`
 	ClosingMeter float64    `json:"closing_meter" gorm:"type:decimal(10,2);not null"`
 	LitersDispensed float64    `json:"liters_dispensed" gorm:"type:decimal(10,2);not null"`
@@ -282,12 +285,11 @@ type PumpReadings struct {
 	ClosingSalesAmount float64   `json:"closing_sales_amount" gorm:"type:decimal(10,2);not null"`
 	TotalSalesAmount  float64   `json:"total_sales_amount" gorm:"type:decimal(10,2);not null"`
 	UnitPrice	 float64   `json:"unit_price" gorm:"type:decimal(10,2);not null"`
-	MpesaAmount	float64		`json:"mpesa_amount" gorm:"type:decimal(10,2);not null"`
-	BankDeposit		float64		`json:"cash_amount" gorm:"type:decimal(10,2);not null"`
 	RecordedBy  uuid.UUID `json:"recorded_by" gorm:"type:varchar(36);not null"`
 	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time      `json:"updated_at" gorm:"autoUpdateTime"`
 	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	Pump        Pump      `json:"pump" gorm:"foreignKey:PumpID;references:ID;constraint:OnUpdate:CASCADE"`
 }
 
 type FuelStock struct {
@@ -307,11 +309,54 @@ type FuelStock struct {
     Station       Station     `json:"station" gorm:"foreignKey:StationID;references:ID"`
 }
 
+type Customer struct{
+	ID          uuid.UUID `json:"id" gorm:"type:varchar(36);primaryKey"`
+	Name        string    `json:"name" gorm:"size:100;not null"`
+	PhoneNumber string    `json:"phone_number" gorm:"size:15;not null"`
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+}
+type CustomerCredit struct {
+	ID          uuid.UUID `json:"id" gorm:"type:varchar(36);primaryKey"`
+	CustomerID  uuid.UUID `json:"customer_id" gorm:"type:varchar(36);not null"`
+	Date		time.Time `json:"date" gorm:"autoCreateTime"`
+	Amount      float64   `json:"amount" gorm:"type:decimal(10,2);not null"`
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+}
+//customer credits payments
+type CustomerCreditPayment struct {
+	ID          uuid.UUID `json:"id" gorm:"type:varchar(36);primaryKey"`
+	CustomerID  uuid.UUID `json:"customer_id" gorm:"type:varchar(36);not null"`
+	Amount      float64   `json:"amount" gorm:"type:decimal(10,2);not null"`
+	PaymentDate time.Time `json:"payment_date" gorm:"autoCreateTime"`
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`	
+}
+
+//accounts
+type DailyAccounts struct {
+	ID          uuid.UUID `json:"id" gorm:"type:varchar(36);primaryKey"`
+	StationID   uuid.UUID `json:"station_id" gorm:"type:varchar(36);not null"`
+	Station		Station   `json:"station" gorm:"foreignKey:StationID;references:ID;constraint:OnUpdate:CASCADE"`
+	TotalSalesAmount float64 `json:"total_sales_amount" gorm:"type:decimal(10,2);not null"`
+	BusinessDay		time.Time `json:"business_day" gorm:"type:date;index"` // Date for which accounts are being recorded
+	TotalExpenses float64 `json:"total_expenses" gorm:"type:decimal(10,2);not null"`
+	DebtTaken float64 `json:"debt_taken" gorm:"type:decimal(10,2);not null"`
+	DebtPaid float64 `json:"debt_paid" gorm:"type:decimal(10,2);not null"`
+	Mpesa float64 `json:"mpesa" gorm:"type:decimal(10,2);not null"`
+	Bank float64 `json:"bank" gorm:"type:decimal(10,2);not null"`
+	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	DeletedAt	*gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+}
 
 //before save supply hook
 func (s *Supply) BeforeSave(tx *gorm.DB) (err error) {
 	s.TotalAmount = s.Quantity * s.UnitPrice
 	return nil
 }
-
 

@@ -59,7 +59,6 @@ func GetSummationOfSalesAndLiters(c *fiber.Ctx) (*[]ResStationSales, error) {
 	var err error
 
 	if dateParam == "" {
-		// Use current date if no date is provided
 		targetDate = time.Now()
 	} else {
 		targetDate, err = time.Parse("2006-01-02", dateParam)
@@ -68,8 +67,8 @@ func GetSummationOfSalesAndLiters(c *fiber.Ctx) (*[]ResStationSales, error) {
 		}
 	}
 
-	startOfDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, targetDate.Location())
-	endOfDay := startOfDay.Add(24 * time.Hour)
+	// Normalize targetDate to midnight for equality checks
+	targetDate = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, targetDate.Location())
 
 	var stations []Station
 	if err := db.
@@ -88,12 +87,9 @@ func GetSummationOfSalesAndLiters(c *fiber.Ctx) (*[]ResStationSales, error) {
 		for _, tank := range station.Tanks {
 			for _, pump := range tank.Pumps {
 				for _, reading := range pump.Readings {
-					// Only include readings within the target day
-					if reading.ReadingDate.After(startOfDay) && reading.ReadingDate.Before(endOfDay) {
+					if reading.BusinessDay.Equal(targetDate) {
 						totalSales += reading.TotalSalesAmount
 						totalLiters += reading.LitersDispensed
-						mpesaAmount += reading.MpesaAmount
-						bankDeposit += reading.BankDeposit
 					}
 				}
 			}
