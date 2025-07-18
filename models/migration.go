@@ -1,6 +1,7 @@
 package models
 
 func MigrateDb(){
+
 	// Perform database migration tasks here
 	db.AutoMigrate(
 		&StationFuelProduct{},

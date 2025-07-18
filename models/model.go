@@ -134,7 +134,7 @@ type FuelTransaction struct {
     ID           uuid.UUID `json:"id" gorm:"type:varchar(36);primaryKey"`
     FuelProductID uuid.UUID `json:"fuel_product_id" gorm:"type:varchar(36)"`
     StationID    uuid.UUID `json:"station_id" gorm:"type:varchar(36);not null"`
-    Type         string    `json:"type" gorm:"type:enum('sale','supply','dipping','adjustment');not null"`
+    Type         string    `json:"type" gorm:"type:varchar(10);not null"`
     Quantity     float64   `json:"quantity" gorm:"not null"`
     PreviousLevel float64  `json:"previous_level" gorm:"not null"`
     NewLevel     float64   `json:"new_level" gorm:"not null"`

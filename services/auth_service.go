@@ -2,9 +2,11 @@ package services
 
 
 import (
+
 	"errors"
 	"os"
 	"time"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -68,7 +70,7 @@ func ValidateToken(tokenString string)(*Claims,error){
 	if ! ok{
 		return nil, errors.New("invalid user token")
 	}
-
+	
 
 	return claims,nil
 }
