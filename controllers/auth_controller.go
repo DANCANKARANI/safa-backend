@@ -62,8 +62,8 @@ func LoginUser(c *fiber.Ctx) error {
 		Name:     "token",
 		Value:    token,
 		Expires:  time.Now().Add(24 * time.Hour),
-		HTTPOnly: true, // Prevent client-side JavaScript access
-		Secure:   false, // Enable in production
+		HTTPOnly: true, 
+		Secure:   true, 
 		SameSite: "Lax",
 		Path:     "/",
 	})
