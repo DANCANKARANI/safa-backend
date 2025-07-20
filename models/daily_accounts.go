@@ -7,13 +7,30 @@ import (
 	"github.com/google/uuid"
 )
 
-//add daily accounts
-func AddDailyAccounts(c *fiber.Ctx)error{
+func AddDailyAccounts(c *fiber.Ctx) error {
 	var dailyAccounts DailyAccounts
 	// Parse the request body into the dailyAccounts struct
 	if err := c.BodyParser(&dailyAccounts); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	// Load Nairobi location once here
+	loc, err := time.LoadLocation("Africa/Nairobi")
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to load location"})
+	}
+
+	// Normalize BusinessDay to midnight Nairobi time
+	if !dailyAccounts.BusinessDay.IsZero() {
+		dailyAccounts.BusinessDay = time.Date(
+			dailyAccounts.BusinessDay.Year(),
+			dailyAccounts.BusinessDay.Month(),
+			dailyAccounts.BusinessDay.Day(),
+			0, 0, 0, 0,
+			loc,
+		)
+	}
+
 	// Validate required fields
 	if dailyAccounts.StationID == uuid.Nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "station_id is required"})
@@ -22,20 +39,25 @@ func AddDailyAccounts(c *fiber.Ctx)error{
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "business_day is required"})
 	}
 	// Ensure business_day is not set to future dates
-	if dailyAccounts.BusinessDay.After(time.Now()) {
+	now := time.Now().In(loc)
+	if dailyAccounts.BusinessDay.After(now) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "business_day cannot be in the future"})
 	}
+
 	dailyAccounts.ID = uuid.New()
+
 	if err := db.Create(&dailyAccounts).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+
 	return c.Status(fiber.StatusCreated).JSON(dailyAccounts)
 }
+
 
 // GetDailyAccounts retrieves all daily accounts from the database
 func GetDailyAccounts(c *fiber.Ctx) error {
 	const DateFormat = "2006-01-02"
-	loc, err := time.LoadLocation("Africa/Nairobi")
+	loc, err := time.LoadLocation("Africa/Nairobi") // Adjust to your business timezone
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to load location",
@@ -43,24 +65,15 @@ func GetDailyAccounts(c *fiber.Ctx) error {
 	}
 
 	dateParam := c.Query("date")
+
 	var startOfDay, endOfDay time.Time
-
 	if dateParam != "" {
-		var parsedDate time.Time
-		// Try parsing YYYY-MM-DD first
-		parsedDate, err = time.ParseInLocation(DateFormat, dateParam, loc)
+		parsedDate, err := time.ParseInLocation(DateFormat, dateParam, loc)
 		if err != nil {
-			// Fallback to full ISO format like 2025-07-20T00:00:00Z
-			parsedDate, err = time.Parse(time.RFC3339, dateParam)
-			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-					"error": "Invalid date format. Use YYYY-MM-DD or ISO format (e.g. 2025-07-20T00:00:00Z)",
-				})
-			}
-			// Convert parsed UTC time to business timezone
-			parsedDate = parsedDate.In(loc)
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid date format. Expected YYYY-MM-DD",
+			})
 		}
-
 		startOfDay = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, loc)
 		endOfDay = startOfDay.Add(24 * time.Hour)
 	} else {
@@ -71,8 +84,7 @@ func GetDailyAccounts(c *fiber.Ctx) error {
 	}
 
 	var dailyAccounts []DailyAccounts
-	if err := db.Preload("Station").
-		Where("business_day >= ? AND business_day < ?", startOfDay, endOfDay).
+	if err := db.Preload("Station").Where("business_day >= ? AND business_day < ?", startOfDay, endOfDay).
 		Find(&dailyAccounts).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to retrieve daily accounts",
@@ -81,7 +93,6 @@ func GetDailyAccounts(c *fiber.Ctx) error {
 
 	return c.JSON(dailyAccounts)
 }
-
 
 func GetMonthlyDailyAccounts(c *fiber.Ctx) error {
 	const DateFormatYYYYMM = "2006-01"
