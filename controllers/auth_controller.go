@@ -63,8 +63,6 @@ func LoginUser(c *fiber.Ctx) error {
 		Value:    token,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HTTPOnly: true, 
-		Secure:   true, 
-		SameSite: fiber.CookieSameSiteNoneMode,
 		Path:     "/",
 	})
 	return utils.SuccessResponse(c, "Login successful", ResponseLogin{
