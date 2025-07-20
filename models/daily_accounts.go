@@ -35,7 +35,7 @@ func AddDailyAccounts(c *fiber.Ctx)error{
 // GetDailyAccounts retrieves all daily accounts from the database
 func GetDailyAccounts(c *fiber.Ctx) error {
 	const DateFormat = "2006-01-02"
-	loc, err := time.LoadLocation("Africa/Nairobi") // Adjust to your business timezone
+	loc, err := time.LoadLocation("Africa/Nairobi")
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to load location",
@@ -43,15 +43,24 @@ func GetDailyAccounts(c *fiber.Ctx) error {
 	}
 
 	dateParam := c.Query("date")
-
 	var startOfDay, endOfDay time.Time
+
 	if dateParam != "" {
-		parsedDate, err := time.ParseInLocation(DateFormat, dateParam, loc)
+		var parsedDate time.Time
+		// Try parsing YYYY-MM-DD first
+		parsedDate, err = time.ParseInLocation(DateFormat, dateParam, loc)
 		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Invalid date format. Expected YYYY-MM-DD",
-			})
+			// Fallback to full ISO format like 2025-07-20T00:00:00Z
+			parsedDate, err = time.Parse(time.RFC3339, dateParam)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "Invalid date format. Use YYYY-MM-DD or ISO format (e.g. 2025-07-20T00:00:00Z)",
+				})
+			}
+			// Convert parsed UTC time to business timezone
+			parsedDate = parsedDate.In(loc)
 		}
+
 		startOfDay = time.Date(parsedDate.Year(), parsedDate.Month(), parsedDate.Day(), 0, 0, 0, 0, loc)
 		endOfDay = startOfDay.Add(24 * time.Hour)
 	} else {
@@ -62,7 +71,8 @@ func GetDailyAccounts(c *fiber.Ctx) error {
 	}
 
 	var dailyAccounts []DailyAccounts
-	if err := db.Preload("Station").Where("business_day >= ? AND business_day < ?", startOfDay, endOfDay).
+	if err := db.Preload("Station").
+		Where("business_day >= ? AND business_day < ?", startOfDay, endOfDay).
 		Find(&dailyAccounts).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to retrieve daily accounts",
@@ -71,6 +81,7 @@ func GetDailyAccounts(c *fiber.Ctx) error {
 
 	return c.JSON(dailyAccounts)
 }
+
 
 func GetMonthlyDailyAccounts(c *fiber.Ctx) error {
 	const DateFormatYYYYMM = "2006-01"
